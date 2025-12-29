@@ -1,0 +1,6 @@
+# Development / test dependencies
+-r requirements.txt
+
+pytest==8.4.2
+# Ensures Starlette/FastAPI TestClient works even if httpx isn't pulled in transitively.
+httpx==0.28.1

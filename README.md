@@ -38,7 +38,7 @@ Create a virtual environment and install dependencies:
 
 - `python -m venv venv`
 - `source venv/bin/activate`
-- `pip install -r requirements.txt`
+- `pip install -r requirements-dev.txt`
 
 Run the API:
 
@@ -68,11 +68,15 @@ Expected:
 
 ## Running tests
 
-This repo currently uses Python’s built-in `unittest`.
+This repo uses `pytest`.
 
 Run all tests:
 
-- `python -m unittest discover -s tests -p 'test_*.py'`
+- `pytest`
+
+Run only the Supabase auth integration test:
+
+- `pytest -q tests/integration/test_supabase_auth_hello.py`
 
 Notes:
 - The integration test signs in to Supabase using `SUPABASE_ANON_KEY` + `TEST_USER_EMAIL`/`TEST_USER_PASSWORD`, then calls `/api/v1/hello` with the returned JWT.
