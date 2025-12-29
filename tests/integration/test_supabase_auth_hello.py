@@ -1,3 +1,7 @@
+"""
+Test integration of Supabase authentication with FastAPI endpoint.
+"""
+
 import os
 
 import pytest
@@ -27,6 +31,9 @@ def _get_session_access_token(auth_response) -> str | None:
 
 @pytest.fixture(scope="session")
 def env() -> dict:
+    """
+    Function to load required environment variables for Supabase auth tests.
+    """
     load_dotenv()
 
     supabase_url = os.getenv("SUPABASE_URL")
@@ -61,16 +68,25 @@ def env() -> dict:
 
 @pytest.fixture()
 def client() -> TestClient:
+    """
+    Fixture to create a TestClient for the FastAPI app tests.
+    """
     app = create_app()
     return TestClient(app)
 
 
 def test_hello_without_token_is_401(client: TestClient) -> None:
+    """
+    Test accessing the /api/v1/hello endpoint without a token returns 401.
+    """
     resp = client.get("/api/v1/hello")
     assert resp.status_code == 401
 
 
 def test_hello_with_supabase_jwt_is_200(client: TestClient, env: dict) -> None:
+    """
+    Test accessing the /api/v1/hello endpoint with a valid Supabase JWT returns 200.
+    """
     supabase = create_client(env["SUPABASE_URL"], env["SUPABASE_ANON_KEY"])
     auth_resp = supabase.auth.sign_in_with_password(
         {
