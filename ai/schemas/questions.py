@@ -208,3 +208,34 @@ class ShortAnswer(BaseModel):
             "Mathematical expressions should be formatted in LaTeX."
         ),
     )
+
+
+class LongAnswer(BaseModel):
+    """
+    A schema representing a long answer question.
+    """
+
+    question: str = Field(
+        ...,
+        description=(
+            "The question text, must not be empty. "
+            "To be written using proper grammar and punctuation. "
+            "Mathematical expressions should be formatted in LaTeX."
+        ),
+    )
+    answer: str = Field(
+        ...,
+        description=(
+            "The correct long answer, must not be empty. "
+            "To be written using proper grammar and punctuation. "
+            "Mathematical expressions should be formatted in LaTeX."
+        ),
+    )
+    explanation: str = Field(
+        ...,
+        description=(
+            "A detailed explanation of the correct answer, must not be empty. "
+            "To be written using proper grammar and punctuation. "
+            "Mathematical expressions should be formatted in LaTeX."
+        ),
+    )

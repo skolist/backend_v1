@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from .auth import require_supabase_user
+from .qgen.router import router as qgen_router
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,8 @@ router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(require_supabase_user)],
 )
+
+router.include_router(qgen_router)
 
 
 @router.get("/hello")
