@@ -2,9 +2,11 @@ import logging
 import uuid
 from typing import List, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+from supabase import Client
 
+from api.v1.auth import get_supabase_client
 from ai.schemas.questions import (
     MCQ4,
     MSQ4,
@@ -51,14 +53,13 @@ class GenerateQuestionsResponse(BaseModel):
 
 
 @router.post("/questions", response_model=GenerateQuestionsResponse)
-def generate_questions(request: GenerateQuestionsRequest):
-    generated_questions = []
+def generate_questions(
+    request: GenerateQuestionsRequest,
+    supabase: Client = Depends(get_supabase_client),
+):
+    generated_count = 0
     
     # Map question types to mocker functions
-    # Note: MSQ is not in req.md "Enum: Question Types" but present in mocker.py
-    # req.md says: MCQ, SHORT_ANSWER, LONG_ANSWER, TRUE_FALSE, FILL_IN_THE_BLANK
-    # mocker.py has: generate_mcq, generate_msq, generate_fill_in_the_blank, generate_true_false, generate_short_answer, generate_long_answer
-    
     type_map = {
         "MCQ": mocker.generate_mcq,
         "SHORT_ANSWER": mocker.generate_short_answer,
@@ -79,89 +80,53 @@ def generate_questions(request: GenerateQuestionsRequest):
         generator_func = type_map[q_type]
         
         for _ in range(count):
-            # The mocker doesn't use args yet, but we pass them as per requirement "gives the requirements to the mocker generate functions"
             try:
-                # We are passing the config and other details to the mocker, 
-                # although the current mocker implementation ignores them.
-                # In a real implementation, we would pass these.
                 question_obj = generator_func(
                     activity_id=request.activity_id,
                     concept_ids=request.concept_ids,
-                    difficulty=request.config.difficulty_distribution # simplified choice logic would go here
+                    difficulty=request.config.difficulty_distribution
                 )
                 
-                # The mocker returns Pydantic models. We need to convert them to dict or compatible structure.
-                # However, the Response Format in req.md defines a specific structure.
-                # The mocker returns objects like MCQ4, which have specific fields.
-                # The req.md response structure expects fields like 'id', 'type', 'marks', etc.
-                # The schemas in ai.schemas.questions DO NOT have 'id', 'type', 'marks', 'hardness', 'concept_ids'.
-                # They only have question, answers, explanation.
-                
-                # So we need to wrap the result from mocker into the expected response format.
-                
+                # Convert Pydantic model to dict for JSONB storage
                 q_data = question_obj.model_dump()
+                q_data["type"] = q_type # Ensure type is part of the content if needed, though usually inferred or separate. 
+                # The schema says "question type, question and the answer" in gen_content description.
                 
-                # Synthesize the missing fields for the response to match req.md
-                # Since this is a mocker integration, we can mock these IDs and metadata.
-                
-                formatted_question = {
-                    "id": str(uuid.uuid4()),
-                    "type": q_type,
-                    "text": q_data.get("question", ""),
-                    "marks": 1, # Default mock
-                    "hardness": "medium", # Default mock
-                    "concept_ids": [str(cid) for cid in request.concept_ids],
-                    "explanation": q_data.get("explanation", ""),
-                    # Handle options/answers specific structure
+                # Prepare insert data for gen_questions
+                # marks and hardness are hardcoded for now as per previous logic/mock
+                insert_data = {
+                    "gen_content": q_data,
+                    "activity_id": str(request.activity_id),
+                    "hardness": "medium", # Default
+                    "marks": 1, # Default
+                    "is_in_draft": False
                 }
                 
-                # Add type specific fields
-                if q_type == "MCQ":
-                    formatted_question["options"] = [
-                        {"id": "opt-1", "text": q_data.get("option1"), "isCorrect": q_data.get("answer") == 1},
-                        {"id": "opt-2", "text": q_data.get("option2"), "isCorrect": q_data.get("answer") == 2},
-                        {"id": "opt-3", "text": q_data.get("option3"), "isCorrect": q_data.get("answer") == 3},
-                        {"id": "opt-4", "text": q_data.get("option4"), "isCorrect": q_data.get("answer") == 4},
-                    ]
-                    # Map integer answer to text if needed, or keep as is. req.md example shows "answer": "Acceleration" (text)
-                    # For now, let's just stick to what we can extract.
-                    # req.md says "answer": "The correct answer key or model answer."
-                    # For MCQ, it seems to be the text of the correct option.
-                    correct_idx = q_data.get("answer")
-                    formatted_question["answer"] = q_data.get(f"option{correct_idx}")
-
-                elif q_type == "MSQ": # Not in req.md but in mocker
-                     formatted_question["options"] = [
-                        {"id": "opt-1", "text": q_data.get("option1"), "isCorrect": 1 in q_data.get("answers", [])},
-                        {"id": "opt-2", "text": q_data.get("option2"), "isCorrect": 2 in q_data.get("answers", [])},
-                        {"id": "opt-3", "text": q_data.get("option3"), "isCorrect": 3 in q_data.get("answers", [])},
-                        {"id": "opt-4", "text": q_data.get("option4"), "isCorrect": 4 in q_data.get("answers", [])},
-                    ]
-                     formatted_question["answer"] = ", ".join([q_data.get(f"option{i}") for i in q_data.get("answers", [])])
-
-                elif q_type == "TRUE_FALSE":
-                    formatted_question["options"] = [
-                        {"id": "tf-1", "text": "True", "isCorrect": q_data.get("answer") is True},
-                        {"id": "tf-2", "text": "False", "isCorrect": q_data.get("answer") is False}
-                    ]
-                    formatted_question["answer"] = str(q_data.get("answer"))
-
-                elif q_type == "FILL_IN_THE_BLANK":
-                    formatted_question["options"] = []
-                    formatted_question["answer"] = q_data.get("answer")
-
-                elif q_type in ["SHORT_ANSWER", "LONG_ANSWER"]:
-                    formatted_question["options"] = []
-                    formatted_question["answer"] = q_data.get("answer")
-
-                generated_questions.append(formatted_question)
+                # Insert into gen_questions
+                res = supabase.table("gen_questions").insert(insert_data).execute()
+                
+                if res.data and len(res.data) > 0:
+                    new_question_id = res.data[0]['id']
+                    
+                    # Insert into gen_questions_concepts_maps
+                    # We need to link this question to all concept_ids in the request
+                    # Assuming concept_ids are valid UUIDs existing in concepts table (referential integrity)
+                    if request.concept_ids:
+                        map_inserts = [
+                            {
+                                "gen_question_id": new_question_id,
+                                "concept_id": str(cid)
+                            } for cid in request.concept_ids
+                        ]
+                        supabase.table("gen_questions_concepts_maps").insert(map_inserts).execute()
+                        
+                    generated_count += 1
                 
             except Exception as e:
-                logger.error(f"Error generating question of type {q_type}: {e}")
-                # Continue or raise? For now continue.
+                logger.error(f"Error generating/storing question of type {q_type}: {e}")
 
     return GenerateQuestionsResponse(
         success=True,
-        message=f"Successfully generated {len(generated_questions)} questions.",
-        data={"questions": generated_questions}
+        message=f"Successfully generated and stored {generated_count} questions.",
+        data={}
     )
