@@ -7,7 +7,12 @@ import logging
 
 from dotenv import load_dotenv
 
-from .pings import check_gemini_api_key, check_openai_api_key, check_supabase_connection, check_supabase_service_key 
+from .pings import (
+    check_gemini_api_key,
+    check_openai_api_key,
+    check_supabase_connection,
+    check_supabase_service_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +38,6 @@ if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY is not set.")
 
 check_gemini_api_key(GEMINI_API_KEY)
-check_openai_api_key(OPENAI_API_KEY )
+check_openai_api_key(OPENAI_API_KEY)
 check_supabase_connection(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 check_supabase_service_key(SUPABASE_URL, SUPABASE_SERVICE_KEY)
