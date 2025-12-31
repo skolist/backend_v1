@@ -8,19 +8,21 @@ from fastapi import APIRouter, Depends, Request
 
 from .auth import require_supabase_user
 from .qgen.router import router as qgen_router
+from .security import router as security_router
 
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
     prefix="/api/v1",
-    dependencies=[Depends(require_supabase_user)],
+    # dependencies=[Depends(require_supabase_user)], # Removed global dependency
 )
 
-router.include_router(qgen_router)
+router.include_router(qgen_router, dependencies=[Depends(require_supabase_user)])
+router.include_router(security_router)
 
 
-@router.get("/hello")
+@router.get("/hello", dependencies=[Depends(require_supabase_user)])
 def hello(request: Request) -> dict:
     """
     A sample endpoint that requires authentication.

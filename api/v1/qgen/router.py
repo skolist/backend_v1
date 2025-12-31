@@ -7,14 +7,7 @@ from pydantic import BaseModel, Field
 from supabase import Client
 
 from api.v1.auth import get_supabase_client
-from ai.schemas.questions import (
-    MCQ4,
-    MSQ4,
-    FillInTheBlank,
-    LongAnswer,
-    ShortAnswer,
-    TrueFalse,
-)
+
 from api.v1.qgen import mocker
 
 logger = logging.getLogger(__name__)
@@ -69,6 +62,17 @@ def generate_questions(
         "MSQ": mocker.generate_msq, 
     }
 
+    # Map generic types to DB types (lowercase usually)
+    # The DB constraint checks for: 'mcq', 'msq', 'short_answer', 'long_answer', 'true_or_false', 'fill_in_the_blanks'
+    db_type_map = {
+        "MCQ": "mcq",
+        "SHORT_ANSWER": "short_answer",
+        "LONG_ANSWER": "long_answer",
+        "TRUE_FALSE": "true_or_false",
+        "FILL_IN_THE_BLANK": "fill_in_the_blanks",
+        "MSQ": "msq",
+    }
+
     for q_type_config in request.config.question_types:
         q_type = q_type_config.type
         count = q_type_config.count
@@ -78,6 +82,7 @@ def generate_questions(
             continue
             
         generator_func = type_map[q_type]
+        db_question_type = db_type_map.get(q_type, "short_answer")
         
         for _ in range(count):
             try:
@@ -87,19 +92,53 @@ def generate_questions(
                     difficulty=request.config.difficulty_distribution
                 )
                 
-                # Convert Pydantic model to dict for JSONB storage
+                # Convert Pydantic model to dict
                 q_data = question_obj.model_dump()
-                q_data["type"] = q_type # Ensure type is part of the content if needed, though usually inferred or separate. 
-                # The schema says "question type, question and the answer" in gen_content description.
                 
-                # Prepare insert data for gen_questions
-                # marks and hardness are hardcoded for now as per previous logic/mock
+                # Prepare Options JSONB
+                options_list = []
+                
+                # Handle Answer extraction first to determine correctness for options
+                answer_val = q_data.get("answer")
+                answers_list = q_data.get("answers") # For MSQ
+                
+                gen_answer_str = None
+                if answer_val is not None:
+                    gen_answer_str = str(answer_val)
+                elif answers_list is not None:
+                    gen_answer_str = str(answers_list)
+
+                # Helper to check correctness
+                def is_correct(idx: int, txt: str) -> bool:
+                    # answer_val can be int (index) or str (text) or bool
+                    if isinstance(answer_val, int):
+                        return answer_val == idx
+                    if isinstance(answer_val, str):
+                        return answer_val == txt
+                    if answers_list:
+                         return idx in answers_list
+                    return False
+
+                # Convert flat options to structured list
+                if "option1" in q_data:
+                    options_list.append({"id": "opt-1", "text": q_data["option1"], "isCorrect": is_correct(1, q_data["option1"])})
+                if "option2" in q_data:
+                    options_list.append({"id": "opt-2", "text": q_data["option2"], "isCorrect": is_correct(2, q_data["option2"])})
+                if "option3" in q_data:
+                    options_list.append({"id": "opt-3", "text": q_data["option3"], "isCorrect": is_correct(3, q_data["option3"])})
+                if "option4" in q_data:
+                    options_list.append({"id": "opt-4", "text": q_data["option4"], "isCorrect": is_correct(4, q_data["option4"])})
+                
                 insert_data = {
-                    "gen_content": q_data,
                     "activity_id": str(request.activity_id),
-                    "hardness": "medium", # Default
-                    "marks": 1, # Default
-                    "is_in_draft": False
+                    "options": options_list, # JSONB
+                    "question_type": db_question_type,
+                    "gen_question_text": q_data.get("question"),
+                    "explanation": q_data.get("explanation"),
+                    "gen_answer": gen_answer_str,
+                    "hardness": "medium", # Default/Mock
+                    "marks": 1, # Default/Mock
+                    "is_in_draft": False,
                 }
                 
                 # Insert into gen_questions
@@ -109,8 +148,6 @@ def generate_questions(
                     new_question_id = res.data[0]['id']
                     
                     # Insert into gen_questions_concepts_maps
-                    # We need to link this question to all concept_ids in the request
-                    # Assuming concept_ids are valid UUIDs existing in concepts table (referential integrity)
                     if request.concept_ids:
                         map_inserts = [
                             {
