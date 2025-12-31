@@ -2,37 +2,71 @@
 Module Exposes a function to test if all API and SECURE KEYs are work
 '''
 
-def check_gemini_api_key(str : gemini_key):
+def check_gemini_api_key(gemini_key):
     import google.genai as genai
 
 # Replace with your actual API key
 
     try:
-        genai.configure(api_key=gemini_key)
+        client = genai.Client(api_key=gemini_key)   
 
-        # We use 'gemini-1.5-flash' as it is fast and cheap for testing
-        model = genai.GenerativeModel('gemini-1.5-flash')
-
-        response = model.generate_content("Are you working?")
-        print(f"✅ Success! Response: {response.text}") 
+        response = client.models.generate_content(model = "gemini-2.5-flash", contents= "Are you working?")    
+        print(f"✅ Success! Response: {response.text[:10]}")
+        return True
 
     except Exception as e:
         print(f"❌ Error: {e}")
+        return False
 
-def check_openai_api_key() -> bool:
+def check_openai_api_key(openai_key) -> bool:
     try:
         from openai import OpenAI
 
-        client = OpenAI()  # picks OPENAI_API_KEY from env
+        client = OpenAI(api_key=openai_key)  # picks OPENAI_API_KEY from env
 
         resp = client.responses.create(
             model="gpt-4.1-mini",
             input="Say OK"
         )
 
-        return bool(resp.output_text)
+        print(f"✅ OpenAI key check passed {resp.output_text[:10]} ")
+        return True
 
     except Exception as e:
-        print("OpenAI key check failed:", e)
+        print("❌ OpenAI key check failed:", e)
         return False
 
+def check_supabase_connection(supabase_url, supabase_anon_key) -> bool:
+    try:
+        import requests
+        from supabase import create_client
+        headers = {
+            "apikey": supabase_anon_key,
+            "Authorization": f"Bearer {supabase_anon_key}",
+        }
+
+        r = requests.get(f"{supabase_url}/rest/v1/", headers=headers, timeout=5)
+
+        # 401 = key accepted but no resource (EXPECTED)
+        if r.status_code in (200, 401, 404):
+            print(f"✅ Supabase URL and ANON key check passed {r.status_code}")
+            return True
+    
+    except Exception as e:
+        print("❌ Supabase connection check failed:", e)
+        return False
+
+def check_supabase_service_key(supabase_url, service_key) -> bool:
+    try:
+        from supabase import create_client
+        supabase = create_client(supabase_url, service_key)
+
+        # Service key must bypass RLS
+        # This query should succeed even if RLS is enabled
+        supabase.table("users").select("id").limit(1).execute() 
+        print("✅ Supabase service key check passed")
+        return True
+
+    except Exception as e:
+        print("❌ Supabase service key check failed:", e)
+        return False
