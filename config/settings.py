@@ -23,7 +23,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
+DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV", "false")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 
 logger.info("Configuration loaded. Production mode: %s", PRODUCTION)
