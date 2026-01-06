@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from config.settings import PRODUCTION
+from config.settings import DEPLOYMENT_ENV
 from api.v1.router import router as v1_router
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
 
     app.include_router(v1_router)
 
-    if PRODUCTION:
+    if DEPLOYMENT_ENV=="PRODUCTION":
         app.add_middleware(
             CORSMiddleware,
             allow_origin_regex=r"https://.*\.skolist\.com",
@@ -30,10 +30,18 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
         logger.info("🌐 Configuring CORS for production")
-    else:
+    elif DEPLOYMENT_ENV=="STAGE":
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],  # Development mode
+            allow_origins=["https://.*\.vercel\.com"],  # Vercel Preview mode
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else DEPLOYMENT_ENV=="LOCAL":
+     app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # Local mode
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
