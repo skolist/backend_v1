@@ -77,3 +77,4 @@ Thumbs.db
 # Local Development Files
 local/
 temp*.py
+.temp
