@@ -32,7 +32,7 @@ jobs:
         with:
           service: "${{ env.SERVICE_PREFIX }}-${{ github.event.pull_request.number }}"
           region: ${{ secrets.GCP_REGION }}
-          project: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
           source: "./"
           flags: |
             --allow-unauthenticated
