@@ -50,13 +50,13 @@ jobs:
         #     --allow-unauthenticated
           flags: |
             --allow-unauthenticated
-            --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_URL_STAGE:latest
-            --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest
-            --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_ANON_KEY_STAGE:latest
-            --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/GEMINI_API_KEY_STAGE:latest
-            --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/OPENAI_API_KEY_STAGE:latest
-            --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_EMAIL_STAGE:latest
-            --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_PASSWORD_STAGE:latest
+            --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_URL_STAGE:latest
+            --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest
+            --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_ANON_KEY_STAGE:latest
+            --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/GEMINI_API_KEY_STAGE:latest
+            --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/OPENAI_API_KEY_STAGE:latest
+            --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/TEST_USER_EMAIL_STAGE:latest
+            --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/TEST_USER_PASSWORD_STAGE:latest
             --set-env-vars=LOGGING_LEVEL=DEBUG
             --set-env-vars=DEPLOYMENT_ENV=STAGE
 
