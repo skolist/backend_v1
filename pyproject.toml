@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Ignore deprecation warnings from third-party packages
+    "ignore::DeprecationWarning:pyiceberg.*",
+    "ignore::DeprecationWarning:supabase.*",
+    "ignore::pydantic.PydanticDeprecatedSince212:pyiceberg.*",
+]
+markers = [
+    "slow: marks tests as slow (use -m 'not slow' to skip)",
+]

@@ -41,6 +41,8 @@ backend/
 │
 ├── config/
 │   └── settings.py     → Environment variable loader
+|
+├── supabase/           → Auto-generated types using supabase-pydantic 
 │
 ├── tests/
 │   └── integration/    → Integration tests (real Supabase auth)

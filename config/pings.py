@@ -18,7 +18,7 @@ def check_gemini_api_key(gemini_key):
         response = client.models.generate_content(
             model="gemini-2.5-flash", contents="Are you working?"
         )
-        print(f"✅ Success! Response: {response.text[:10]}")
+        print(f"✅ Gemini Key Check passed OK ! Response: {response.text[:10]}")
         return True
 
     except Exception as e:
