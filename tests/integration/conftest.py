@@ -87,9 +87,7 @@ def env() -> Dict[str, str]:
         if not value
     ]
     if missing:
-        pytest.skip(
-            "Missing env vars for integration tests: " + ", ".join(missing)
-        )
+        pytest.skip("Missing env vars for integration tests: " + ", ".join(missing))
 
     return {
         "SUPABASE_URL": supabase_url,
@@ -300,9 +298,7 @@ def test_concepts(
     yield response.data
 
     # Cleanup: Delete test concepts
-    service_supabase_client.table("concepts").delete().in_(
-        "id", concept_ids
-    ).execute()
+    service_supabase_client.table("concepts").delete().in_("id", concept_ids).execute()
 
 
 @pytest.fixture
@@ -351,9 +347,7 @@ def test_activity(
         ).execute()
 
     # Delete the activity
-    service_supabase_client.table("activities").delete().eq(
-        "id", activity_id
-    ).execute()
+    service_supabase_client.table("activities").delete().eq("id", activity_id).execute()
 
 
 @pytest.fixture
