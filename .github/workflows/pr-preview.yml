@@ -34,31 +34,31 @@ jobs:
           region: ${{ secrets.GCP_REGION }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           source: "./"
-          secrets: |
-            SUPABASE_URL=SUPABASE_URL_STAGE:latest
-            SUPABASE_SERVICE_KEY=SUPABASE_SERVICE_KEY_STAGE:latest
-            SUPABASE_ANON_KEY=SUPABASE_ANON_KEY_STAGE:latest
-            GEMINI_API_KEY=GEMINI_API_KEY_STAGE:latest
-            OPENAI_API_KEY=OPENAI_API_KEY_STAGE:latest
-            TEST_USER_EMAIL=TEST_USER_EMAIL_STAGE:latest
-            TEST_USER_PASSWORD=TEST_USER_PASSWORD_STAGE:latest
-          # Use the dedicated 'env_vars' input
-          env_vars: |
-            LOGGING_LEVEL=DEBUG
-            DEPLOYMENT_ENV=STAGE
-          flags: |
-            --allow-unauthenticated
+        #   secrets: |
+        #     SUPABASE_URL=SUPABASE_URL_STAGE:latest
+        #     SUPABASE_SERVICE_KEY=SUPABASE_SERVICE_KEY_STAGE:latest
+        #     SUPABASE_ANON_KEY=SUPABASE_ANON_KEY_STAGE:latest
+        #     GEMINI_API_KEY=GEMINI_API_KEY_STAGE:latest
+        #     OPENAI_API_KEY=OPENAI_API_KEY_STAGE:latest
+        #     TEST_USER_EMAIL=TEST_USER_EMAIL_STAGE:latest
+        #     TEST_USER_PASSWORD=TEST_USER_PASSWORD_STAGE:latest
+        #   # Use the dedicated 'env_vars' input
+        #   env_vars: |
+        #     LOGGING_LEVEL=DEBUG
+        #     DEPLOYMENT_ENV=STAGE
         #   flags: |
         #     --allow-unauthenticated
-        #     --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_URL_STAGE:latest
-        #     --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest
-        #     --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_ANON_KEY_STAGE:latest
-        #     --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/GEMINI_API_KEY_STAGE:latest
-        #     --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/OPENAI_API_KEY_STAGE:latest
-        #     --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_EMAIL_STAGE:latest
-        #     --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_PASSWORD_STAGE:latest
-        #     --set-env-vars=LOGGING_LEVEL=DEBUG
-        #     --set-env-vars=DEPLOYMENT_ENV=STAGE
+          flags: |
+            --allow-unauthenticated
+            --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_URL_STAGE:latest
+            --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest
+            --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_ANON_KEY_STAGE:latest
+            --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/GEMINI_API_KEY_STAGE:latest
+            --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/OPENAI_API_KEY_STAGE:latest
+            --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_EMAIL_STAGE:latest
+            --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_PASSWORD_STAGE:latest
+            --set-env-vars=LOGGING_LEVEL=DEBUG
+            --set-env-vars=DEPLOYMENT_ENV=STAGE
 
       - name: Post Preview Comment
         uses: marocchino/sticky-pull-request-comment@v2
