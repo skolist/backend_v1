@@ -23,10 +23,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-PRODUCTION = os.getenv("PRODUCTION", "false").lower() == "true"
+DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 
-logger.info("Configuration loaded. Production mode: %s", PRODUCTION)
+logger.info("Configuration loaded. Environment mode: %s", DEPLOYMENT_ENV)
 
 if not SUPABASE_URL:
     logger.warning("SUPABASE_URL is not set.")
@@ -36,6 +36,9 @@ if not GEMINI_API_KEY:
     logger.warning("GEMINI_API_KEY is not set.")
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY is not set.")
+if not DEPLOYMENT_ENV or DEPLOYMENT_ENV not in {"PRODUCTION", "STAGE", "LOCAL"}:
+    logger.warning("DEPLOYMENT_ENV is not set. Defaulting to LOCAL.")
+    DEPLOYMENT_ENV = "LOCAL"
 
 check_gemini_api_key(GEMINI_API_KEY)
 check_openai_api_key(OPENAI_API_KEY)

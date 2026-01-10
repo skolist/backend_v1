@@ -4,17 +4,31 @@
 """
 Router for the dummy endpoint
 """
-
+import os
 import logging
 import uuid
 from typing import List, Literal
 
+import google.genai as genai
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from supabase import Client
 
+from ai.prompts.qgen import (
+    generate_question_distribution_prompt,
+    generate_questions_prompt,
+)
+from ai.schemas.qgen import ConceptQuestionTypeDistribution, TotalQuestionTypeCounts
+from ai.schemas.questions import (
+    MCQ4,
+    MSQ4,
+    FillInTheBlank,
+    TrueFalse,
+    ShortAnswer,
+    LongAnswer,
+    ALL_QUESTIONS,
+)
 from api.v1.auth import get_supabase_client
-
 from api.v1.qgen import mocker
 
 logger = logging.getLogger(__name__)
@@ -28,7 +42,7 @@ class QuestionTypeConfig(BaseModel):
     """
 
     type: Literal[
-        "MCQ", "SHORT_ANSWER", "LONG_ANSWER", "TRUE_FALSE", "FILL_IN_THE_BLANK", "MSQ"
+        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4"
     ]
     count: int
 
@@ -72,152 +86,106 @@ class GenerateQuestionsResponse(BaseModel):
     data: dict
 
 
+def extract_total_question_type_counts(
+    request: GenerateQuestionsRequest,
+) -> TotalQuestionTypeCounts:
+    QUESTION_TYPE_TO_FIELD = {
+        "mcq4": "total_mcq4s",
+        "msq4": "total_msq4s",
+        "fill_in_the_blank": "total_fill_in_the_blanks",
+        "true_false": "total_true_falses",
+        "short_answer": "total_short_answers",
+        "long_answer": "total_long_answers",
+    }
+
+    totals = TotalQuestionTypeCounts()
+
+    for qt in request.config.question_types:
+        field_name = QUESTION_TYPE_TO_FIELD.get(qt.type)
+        if not field_name:
+            continue  # or raise if you want strictness
+
+        setattr(
+            totals,
+            field_name,
+            getattr(totals, field_name) + qt.count,
+        )
+
+    return totals
+
+
 @router.post("/questions", response_model=GenerateQuestionsResponse)
 def generate_questions(
     request: GenerateQuestionsRequest,
     supabase: Client = Depends(get_supabase_client),
 ):
-    """
-    Dummy route
-    """
-    generated_count = 0
 
-    # Map question types to mocker functions
-    type_map = {
-        "MCQ": mocker.generate_mcq,
-        "SHORT_ANSWER": mocker.generate_short_answer,
-        "LONG_ANSWER": mocker.generate_long_answer,
-        "TRUE_FALSE": mocker.generate_true_false,
-        "FILL_IN_THE_BLANK": mocker.generate_fill_in_the_blank,
-        "MSQ": mocker.generate_msq,
-    }
-
-    db_type_map = {
-        "MCQ": "mcq",
-        "SHORT_ANSWER": "short_answer",
-        "LONG_ANSWER": "long_answer",
-        "TRUE_FALSE": "true_or_false",
-        "FILL_IN_THE_BLANK": "fill_in_the_blanks",
-        "MSQ": "msq",
-    }
-
-    for q_type_config in request.config.question_types:
-        q_type = q_type_config.type
-        count = q_type_config.count
-
-        if q_type not in type_map:
-            logger.warning("Unsupported question type requested: %s", q_type)
-            continue
-
-        generator_func = type_map[q_type]
-        db_question_type = db_type_map.get(q_type, "short_answer")
-
-        for _ in range(count):
-            try:
-                question_obj = generator_func(
-                    # activity_id=request.activity_id,
-                    # concept_ids=request.concept_ids,
-                    # difficulty=request.config.difficulty_distribution,
-                )
-
-                # Convert Pydantic model to dict
-                q_data = question_obj.model_dump()
-
-                # Prepare Options JSONB
-                options_list = []
-
-                # Handle Answer extraction first to determine correctness for options
-                answer_val = q_data.get("answer")
-                answers_list = q_data.get("answers")  # For MSQ
-
-                gen_answer_str = None
-                if answer_val is not None:
-                    gen_answer_str = str(answer_val)
-                elif answers_list is not None:
-                    gen_answer_str = str(answers_list)
-
-                # Helper to check correctness
-                def is_correct(idx: int, txt: str) -> bool:
-                    # answer_val can be int (index) or str (text) or bool
-                    if isinstance(answer_val, int):
-                        return answer_val == idx
-                    if isinstance(answer_val, str):
-                        return answer_val == txt
-                    if answers_list:
-                        return idx in answers_list
-                    return False
-
-                # Convert flat options to structured list
-                if "option1" in q_data:
-                    options_list.append(
-                        {
-                            "id": "opt-1",
-                            "text": q_data["option1"],
-                            "isCorrect": is_correct(1, q_data["option1"]),
-                        }
-                    )
-                if "option2" in q_data:
-                    options_list.append(
-                        {
-                            "id": "opt-2",
-                            "text": q_data["option2"],
-                            "isCorrect": is_correct(2, q_data["option2"]),
-                        }
-                    )
-                if "option3" in q_data:
-                    options_list.append(
-                        {
-                            "id": "opt-3",
-                            "text": q_data["option3"],
-                            "isCorrect": is_correct(3, q_data["option3"]),
-                        }
-                    )
-                if "option4" in q_data:
-                    options_list.append(
-                        {
-                            "id": "opt-4",
-                            "text": q_data["option4"],
-                            "isCorrect": is_correct(4, q_data["option4"]),
-                        }
-                    )
-
-                insert_data = {
-                    "activity_id": str(request.activity_id),
-                    "options": options_list,  # JSONB
-                    "question_type": db_question_type,
-                    "gen_question_text": q_data.get("question"),
-                    "explanation": q_data.get("explanation"),
-                    "gen_answer": gen_answer_str,
-                    "hardness": "medium",  # Default/Mock
-                    "marks": 1,  # Default/Mock
-                    "is_in_draft": False,
-                }
-
-                # Insert into gen_questions
-                res = supabase.table("gen_questions").insert(insert_data).execute()
-
-                if res.data and len(res.data) > 0:
-                    new_question_id = res.data[0]["id"]
-
-                    # Insert into gen_questions_concepts_maps
-                    if request.concept_ids:
-                        map_inserts = [
-                            {"gen_question_id": new_question_id, "concept_id": str(cid)}
-                            for cid in request.concept_ids
-                        ]
-                        supabase.table("gen_questions_concepts_maps").insert(
-                            map_inserts
-                        ).execute()
-
-                    generated_count += 1
-
-            except Exception as e:
-                logger.error(
-                    "Error generating/storing question of type %s: %s", q_type, e
-                )
-
-    return GenerateQuestionsResponse(
-        success=True,
-        message=f"Successfully generated and stored {generated_count} questions.",
-        data={},
+    # Code to fetch the concepts from the ids
+    concepts = (
+        supabase.table("concepts")
+        .select("name, description")
+        .eq("id", request.concept_ids)
+        .execute()
+        .data
     )
+    concepts_dict = {concept["name"]: concept["description"] for concept in concepts}
+    # Code to fetch the old questions for this concepts from supabase
+    old_questions = (
+        supabase.table("bank_questions")
+        .select("*")
+        .eq("concept_id", request.concept_ids)
+        .execute()
+        .data
+    )
+
+    # Forming the question type count mapping using the request
+    question_type_count_mapping = extract_total_question_type_counts(request)
+
+    # Code to generate the concept to number of question type mapping
+    gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    response = gemini_client.models.generate_content(
+        model="gemini-2.0-flash-exp",
+        contents=generate_question_distribution_prompt(
+            question_type_count_dict=question_type_count_mapping.dict(),
+            concepts_list=concepts,
+            old_questions_on_this_concepts=old_questions,
+        ),
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": ConceptQuestionTypeDistribution,
+        },
+    )
+    distribution: ConceptQuestionTypeDistribution = response.parsed
+
+    # Code to generate the questions
+    all_questions: List[ALL_QUESTIONS] = []
+    QUESTION_TYPE_TO_BASE_MODEL = {
+        "mcq4": MCQ4,
+        "msq4": MSQ4,
+        "fill_in_the_blank": FillInTheBlank,
+        "true_false": TrueFalse,
+        "short_answer": ShortAnswer,
+        "long_answer": LongAnswer,
+    }
+    # Need to iterate over the distribution and generate the questions per concept
+    for concept_name, question_type_count in distribution.distribution.items():
+        # Iterating over all types
+        for question_type, count in question_type_count.items():
+            # Code to generate the questions
+            questions = gemini_client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents=generate_questions_prompt(
+                    concept=concept_name,
+                    description=concepts_dict.get(concept_name),
+                    old_questions_on_this_concept=old_questions,
+                    n=count,
+                    question_type=question_type,
+                ),
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": List[
+                        QUESTION_TYPE_TO_BASE_MODEL.get(question_type)
+                    ],
+                },
+            )
+            all_questions.extend(questions.parsed)
