@@ -1,0 +1,54 @@
+name: "Cloud Run PR Preview"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  SERVICE_PREFIX: "backend-pr"
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Deploy PR Preview
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: "${{ env.SERVICE_PREFIX }}-${{ github.event.pull_request.number }}"
+          region: ${{ secrets.GCP_REGION }}
+          project: ${{ secrets.GCP_PROJECT_ID }}
+          source: "./"
+          flags: |
+            --allow-unauthenticated \
+            --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_URL_STAGE:latest \
+            --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest \
+            --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/SUPABASE_ANON_KEY_STAGE:latest \
+            --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/GEMINI_API_KEY_STAGE:latest \
+            --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/OPENAI_API_KEY_STAGE:latest \
+            --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_EMAIL_STAGE:latest \
+            --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_ID }}/secrets/TEST_USER_PASSWORD_STAGE:latest \
+            --set-env-vars=LOGGING_LEVEL_DEBUG=true
+
+      - name: Post Preview Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cloud-run-preview
+          message: |
+            🚀 **Backend Preview Deployed**
+            URL: ${{ steps.deploy.outputs.url }}
