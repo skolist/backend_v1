@@ -1,0 +1,38 @@
+name: "Cleanup Cloud Run Preview"
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  SERVICE_PREFIX: "backend-pr"
+
+jobs:
+  cleanup-preview:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Auth to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete Cloud Run Service
+        run: |
+          SERVICE_NAME="${{ env.SERVICE_PREFIX }}-${{ github.event.pull_request.number }}"
+          
+          echo "🗑️ Deleting Cloud Run service: $SERVICE_NAME"
+          
+          # Try to delete the service; if it doesn't exist, just echo a message (avoids workflow failure)
+          gcloud run services delete $SERVICE_NAME \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --quiet || echo "Service $SERVICE_NAME not found or already deleted."

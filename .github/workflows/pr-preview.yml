@@ -1,0 +1,69 @@
+name: "Cloud Run PR Preview"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  SERVICE_PREFIX: "backend-pr"
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Deploy PR Preview
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: "${{ env.SERVICE_PREFIX }}-${{ github.event.pull_request.number }}"
+          region: ${{ secrets.GCP_REGION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          source: "./"
+        #   secrets: |
+        #     SUPABASE_URL=SUPABASE_URL_STAGE:latest
+        #     SUPABASE_SERVICE_KEY=SUPABASE_SERVICE_KEY_STAGE:latest
+        #     SUPABASE_ANON_KEY=SUPABASE_ANON_KEY_STAGE:latest
+        #     GEMINI_API_KEY=GEMINI_API_KEY_STAGE:latest
+        #     OPENAI_API_KEY=OPENAI_API_KEY_STAGE:latest
+        #     TEST_USER_EMAIL=TEST_USER_EMAIL_STAGE:latest
+        #     TEST_USER_PASSWORD=TEST_USER_PASSWORD_STAGE:latest
+        #   # Use the dedicated 'env_vars' input
+        #   env_vars: |
+        #     LOGGING_LEVEL=DEBUG
+        #     DEPLOYMENT_ENV=STAGE
+        #   flags: |
+        #     --allow-unauthenticated
+          flags: |
+            --allow-unauthenticated
+            --set-secrets=SUPABASE_URL=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_URL_STAGE:latest
+            --set-secrets=SUPABASE_SERVICE_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_SERVICE_KEY_STAGE:latest
+            --set-secrets=SUPABASE_ANON_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/SUPABASE_ANON_KEY_STAGE:latest
+            --set-secrets=GEMINI_API_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/GEMINI_API_KEY_STAGE:latest
+            --set-secrets=OPENAI_API_KEY=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/OPENAI_API_KEY_STAGE:latest
+            --set-secrets=TEST_USER_EMAIL=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/TEST_USER_EMAIL_STAGE:latest
+            --set-secrets=TEST_USER_PASSWORD=projects/${{ secrets.GCP_PROJECT_NUMBER }}/secrets/TEST_USER_PASSWORD_STAGE:latest
+            --set-env-vars=LOGGING_LEVEL=DEBUG
+            --set-env-vars=DEPLOYMENT_ENV=STAGE
+
+      - name: Post Preview Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cloud-run-preview
+          message: |
+            🚀 **Backend Preview Deployed**
+            URL: ${{ steps.deploy.outputs.url }}
