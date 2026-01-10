@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     elif DEPLOYMENT_ENV == "STAGE":
         app.add_middleware(
             CORSMiddleware,
-            allow_origin_regex=[r"https://.*\.vercel\.app"],  # Vercel Preview mode
+            allow_origin_regex=r"https://.*\.vercel\.app",  # Vercel Preview mode
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
