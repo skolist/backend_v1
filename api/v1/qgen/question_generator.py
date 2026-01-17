@@ -6,207 +6,28 @@ All question generation logic in one place - schemas, prompts, and endpoint.
 import os
 import logging
 import uuid
-from typing import List, Literal, Dict, Optional, Type, Union
+from typing import List, Literal, Dict
 
-import google.genai as genai
-from fastapi import APIRouter, Depends, status
+from google import genai
+from fastapi import Depends, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 import supabase
 
 from api.v1.auth import get_supabase_client
 from supabase_dir import (
-    PublicQuestionTypeEnumEnum,
     PublicHardnessLevelEnumEnum,
     GenQuestionsInsert,
     GenQuestionsConceptsMapsInsert,
 )
+from .models import (
+    AllQuestions,
+    QUESTION_TYPE_TO_SCHEMA,
+    QUESTION_TYPE_TO_ENUM,
+    QUESTION_TYPE_TO_FIELD,
+)
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/generate", tags=["generation"])
-
-
-# ============================================================================
-# QUESTION SCHEMAS FOR GEMINI (Explicit definitions for structured output)
-# ============================================================================
-
-
-class MCQ4(BaseModel):
-    """MCQ4 question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    option1: Optional[str] = Field(default=None, description="First option")
-    option2: Optional[str] = Field(default=None, description="Second option")
-    option3: Optional[str] = Field(default=None, description="Third option")
-    option4: Optional[str] = Field(default=None, description="Fourth option")
-    correct_mcq_option: Optional[int] = Field(
-        default=None, description="Correct option (1-4)"
-    )
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    answer_text: Optional[str] = Field(
-        default=None, description="Answer text if applicable"
-    )
-
-
-class MCQ4List(BaseModel):
-    """List of MCQ4 questions."""
-
-    questions: List[MCQ4]
-
-
-class MSQ4(BaseModel):
-    """MSQ4 question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    option1: Optional[str] = Field(default=None, description="First option")
-    option2: Optional[str] = Field(default=None, description="Second option")
-    option3: Optional[str] = Field(default=None, description="Third option")
-    option4: Optional[str] = Field(default=None, description="Fourth option")
-    msq_option1_answer: Optional[bool] = Field(
-        default=None, description="Is option 1 correct"
-    )
-    msq_option2_answer: Optional[bool] = Field(
-        default=None, description="Is option 2 correct"
-    )
-    msq_option3_answer: Optional[bool] = Field(
-        default=None, description="Is option 3 correct"
-    )
-    msq_option4_answer: Optional[bool] = Field(
-        default=None, description="Is option 4 correct"
-    )
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    answer_text: Optional[str] = Field(
-        default=None, description="Answer text if applicable"
-    )
-
-
-class MSQ4List(BaseModel):
-    """List of MSQ4 questions."""
-
-    questions: List[MSQ4]
-
-
-class FillInTheBlank(BaseModel):
-    """Fill in the blank question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(
-        default=None, description="The question text with blank"
-    )
-    answer_text: Optional[str] = Field(default=None, description="The correct answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-
-
-class FillInTheBlankList(BaseModel):
-    """List of FillInTheBlank questions."""
-
-    questions: List[FillInTheBlank]
-
-
-class TrueFalse(BaseModel):
-    """True/False question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(
-        default=None, description="The statement to evaluate"
-    )
-    answer_text: Optional[str] = Field(default=None, description="True or False")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-
-
-class TrueFalseList(BaseModel):
-    """List of TrueFalse questions."""
-
-    questions: List[TrueFalse]
-
-
-class ShortAnswer(BaseModel):
-    """Short answer question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    answer_text: Optional[str] = Field(default=None, description="The short answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-
-
-class ShortAnswerList(BaseModel):
-    """List of ShortAnswer questions."""
-
-    questions: List[ShortAnswer]
-
-
-class LongAnswer(BaseModel):
-    """Long answer question schema for Gemini structured output."""
-
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    answer_text: Optional[str] = Field(default=None, description="The long answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-
-
-class LongAnswerList(BaseModel):
-    """List of LongAnswer questions."""
-
-    questions: List[LongAnswer]
-
-
-# Type alias for any question type
-ALL_QUESTIONS = Union[MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer]
-
-
-# Mapping from question type key to GenAI schema (list wrapper)
-QUESTION_TYPE_TO_SCHEMA: Dict[str, Type[BaseModel]] = {
-    "mcq4": MCQ4List,
-    "msq4": MSQ4List,
-    "fill_in_the_blank": FillInTheBlankList,
-    "true_false": TrueFalseList,
-    "short_answer": ShortAnswerList,
-    "long_answer": LongAnswerList,
-}
-
-# Mapping from question type key to database enum value
-QUESTION_TYPE_TO_ENUM: Dict[str, PublicQuestionTypeEnumEnum] = {
-    "mcq4": PublicQuestionTypeEnumEnum.MCQ4,
-    "msq4": PublicQuestionTypeEnumEnum.MSQ4,
-    "fill_in_the_blank": PublicQuestionTypeEnumEnum.FILL_IN_THE_BLANKS,
-    "true_false": PublicQuestionTypeEnumEnum.TRUE_OR_FALSE,
-    "short_answer": PublicQuestionTypeEnumEnum.SHORT_ANSWER,
-    "long_answer": PublicQuestionTypeEnumEnum.LONG_ANSWER,
-}
-
 
 # ============================================================================
 # CONFIGURATION SCHEMAS
@@ -306,7 +127,7 @@ class GenerateQuestionsRequest(BaseModel):
 def generate_question_distribution_prompt(
     question_type_count_dict: TotalQuestionTypeCounts,
     concepts_list: List[str],
-    old_questions_on_this_concepts: Dict[str, List[ALL_QUESTIONS]],
+    old_questions_on_this_concepts: Dict[str, List[AllQuestions]],
 ) -> str:
     """Generate prompt for distributing questions across concepts."""
 
@@ -328,7 +149,7 @@ def generate_question_distribution_prompt(
 def generate_questions_prompt(
     concept: str,
     description: str,
-    old_questions_on_this_concept: List[ALL_QUESTIONS],
+    old_questions_on_this_concept: List[AllQuestions],
     n: int,
     question_type: str,
 ) -> str:
@@ -361,15 +182,6 @@ def extract_total_question_type_counts(
     request: GenerateQuestionsRequest,
 ) -> TotalQuestionTypeCounts:
     """Extract total question type counts from the request."""
-
-    QUESTION_TYPE_TO_FIELD = {
-        "mcq4": "total_mcq4s",
-        "msq4": "total_msq4s",
-        "fill_in_the_blank": "total_fill_in_the_blanks",
-        "true_false": "total_true_falses",
-        "short_answer": "total_short_answers",
-        "long_answer": "total_long_answers",
-    }
 
     totals = TotalQuestionTypeCounts()
 
@@ -488,22 +300,23 @@ def generate_questions_for_distribution(
                     "response_schema": question_schema,
                 },
             )
-
-            # Convert generated questions to GenQuestionsInsert-compatible dicts
-            for q in questions_response.parsed.questions:
-                gen_question_dict = {
-                    **q.model_dump(),
-                    "activity_id": str(activity_id),
-                    "question_type": question_type_enum,
-                    "hardness_level": default_hardness,
-                    "marks": default_marks,
-                }
-                gen_questions_data.append(
-                    {
-                        "question": gen_question_dict,
-                        "concept_id": concept_id,
+            try:
+                for q in questions_response.parsed.questions:
+                    gen_question_dict = {
+                        **q.model_dump(),
+                        "activity_id": str(activity_id),
+                        "question_type": question_type_enum,
+                        "hardness_level": default_hardness,
+                        "marks": default_marks,
                     }
-                )
+                    gen_questions_data.append(
+                        {
+                            "question": gen_question_dict,
+                            "concept_id": concept_id,
+                        }
+                    )
+            except Exception as e:
+                logger.error(f"Error parsing questions response: {e}", exc_info=True)
 
     return gen_questions_data
 
@@ -513,7 +326,6 @@ def generate_questions_for_distribution(
 # ============================================================================
 
 
-@router.post("/questions", status_code=status.HTTP_201_CREATED)
 def generate_questions(
     request: GenerateQuestionsRequest,
     supabase_client: supabase.Client = Depends(get_supabase_client),

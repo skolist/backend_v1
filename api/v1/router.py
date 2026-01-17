@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from .auth import require_supabase_user
-from .qgen.question_generator import router as qgen_router
+from .qgen.router import router as qgen_router
 from .security import router as security_router
 
 logger = logging.getLogger(__name__)

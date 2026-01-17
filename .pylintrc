@@ -1,13 +1,9 @@
-[MASTER]
-ignore = tests
-
 [MAIN]
 
 # Analyse import fallback blocks. This can be used to support both Python 2 and
 # 3 compatible code, which means that the block might have code that exists
 # only in one or another interpreter, leading to false positives when analysed.
 analyse-fallback-blocks=no
-
 # Clear in-memory caches upon conclusion of linting. Useful if running pylint
 # in a server-like mode.
 clear-cache-post-run=no
@@ -49,7 +45,7 @@ fail-under=10
 #from-stdin=
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=CVS,venv,.venv,env,.env,schema_public_latest.py
+ignore=CVS,venv,.venv,env,.env,schema_public_latest.py,tests
 
 # Add files or directories matching the regular expressions patterns to the
 # ignore-list. The regex matches against paths and can be in Posix or Windows
@@ -449,7 +445,12 @@ disable=raw-checker-failed,
         use-symbolic-message-instead,
         use-implicit-booleaness-not-comparison-to-string,
         use-implicit-booleaness-not-comparison-to-zero,
-        redefined-outer-name
+        redefined-outer-name,
+        W1203,
+        W0718,
+        R0913,
+        R0917,
+        R0914
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

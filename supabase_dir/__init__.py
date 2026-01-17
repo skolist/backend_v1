@@ -1,3 +1,8 @@
+"""
+Exposes the supabase types from the generated
+file in entities directory
+"""
+
 from .entities.fastapi.schema_public_latest import (
     PublicQuestionTypeEnumEnum,
     PublicHardnessLevelEnumEnum,
