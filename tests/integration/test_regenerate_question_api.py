@@ -27,7 +27,7 @@ def test_gen_question_for_regeneration(
     Create a test generated question in Supabase for regeneration testing.
     """
     question_id = str(uuid.uuid4())
-    
+
     question_data = {
         "id": question_id,
         "activity_id": test_activity["id"],
@@ -46,9 +46,7 @@ def test_gen_question_for_regeneration(
 
     # Insert question
     response = (
-        service_supabase_client.table("gen_questions")
-        .insert(question_data)
-        .execute()
+        service_supabase_client.table("gen_questions").insert(question_data).execute()
     )
 
     yield response.data[0]
@@ -92,7 +90,7 @@ class TestRegenerateQuestionAuth:
         Test that the endpoint returns 401 with an invalid token.
         """
         from fastapi.testclient import TestClient
-        
+
         client = TestClient(app)
         client.headers["Authorization"] = "Bearer invalid_token_here"
 
@@ -337,7 +335,7 @@ class TestRegenerateQuestionEdgeCases:
         Create a test short answer question for edge case testing.
         """
         question_id = str(uuid.uuid4())
-        
+
         question_data = {
             "id": question_id,
             "activity_id": test_activity["id"],

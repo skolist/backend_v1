@@ -5,7 +5,6 @@ to regenerate a question with a custom prompt and optional files
 
 import os
 import logging
-import base64
 from typing import Optional, List
 
 import supabase
@@ -43,11 +42,11 @@ def regenerate_question_with_prompt_prompt(
 ) -> str:
     """
     Generate prompt to regenerate a question with optional custom instructions.
-    
+
     Args:
         gen_question: Dictionary containing question data
         custom_prompt: Optional custom instructions for regeneration
-    
+
     Returns:
         Formatted prompt string
     """
@@ -79,22 +78,22 @@ You are given this question {gen_question}. Using the same concepts in this ques
 async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
     """
     Process uploaded files and convert them to Gemini Part objects.
-    
+
     Args:
         files: List of uploaded files
-    
+
     Returns:
         List of Gemini Part objects for the files
     """
     parts = []
-    
+
     for file in files:
         if file.filename and file.size and file.size > 0:
             content = await file.read()
-            
+
             # Determine mime type
             content_type = file.content_type or "application/octet-stream"
-            
+
             # Handle different file types
             if content_type.startswith("image/"):
                 # Image files - encode as base64 for inline data
@@ -140,10 +139,10 @@ async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
                         mime_type=content_type,
                     )
                 )
-            
+
             # Reset file pointer for potential re-reads
             await file.seek(0)
-    
+
     return parts
 
 
@@ -160,16 +159,16 @@ def regenerate_question_with_prompt_logic(
 ) -> AllQuestions:
     """
     Regenerate a question using Gemini API with custom prompt and files.
-    
+
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
         custom_prompt: Optional custom instructions for regeneration
         file_parts: Optional list of Gemini Part objects for attached files
-    
+
     Returns:
         Regenerated question as AllQuestions type
-    
+
     Raises:
         Exception: If Gemini API call fails
     """
@@ -178,17 +177,17 @@ def regenerate_question_with_prompt_logic(
         gen_question=gen_question_data,
         custom_prompt=custom_prompt,
     )
-    
+
     # Build content parts
     contents = []
-    
+
     # Add file parts first (if any) so the model can reference them
     if file_parts:
         contents.extend(file_parts)
-    
+
     # Add the text prompt
     contents.append(types.Part.from_text(text=prompt_text))
-    
+
     # Generate response
     questions_response = gemini_client.models.generate_content(
         model="gemini-2.0-flash",
@@ -198,7 +197,7 @@ def regenerate_question_with_prompt_logic(
             "response_schema": RegeneratedQuestionWithPrompt,
         },
     )
-    
+
     return questions_response.parsed.question
 
 
@@ -215,16 +214,16 @@ async def regenerate_question_with_prompt(
 ):
     """
     API endpoint to regenerate a question with a custom prompt and optional files.
-    
+
     If no prompt or files are provided, the question will be regenerated using
     similar concepts (same behavior as the basic regenerate_question endpoint).
-    
+
     Args:
         gen_question_id: UUID of the question to regenerate
         prompt: Optional custom instructions for regeneration
         files: Optional list of files to attach for context
         supabase_client: Supabase client with authentication
-    
+
     Returns:
         200 OK on success
         404 Not Found if question doesn't exist
@@ -238,24 +237,24 @@ async def regenerate_question_with_prompt(
             .eq("id", gen_question_id)
             .execute()
         )
-        
+
         if not gen_question.data:
             raise HTTPException(status_code=404, detail="Gen Question not found")
-        
+
         gen_question_data = gen_question.data[0]
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     try:
         # Process uploaded files if any
         file_parts = None
         if files:
             file_parts = await process_uploaded_files(files)
-        
+
         # Initialize Gemini client and regenerate the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         regenerated_question = regenerate_question_with_prompt_logic(
@@ -264,21 +263,21 @@ async def regenerate_question_with_prompt(
             custom_prompt=prompt,
             file_parts=file_parts,
         )
-        
+
     except Exception as e:
         logger.error(f"Error regenerating question with prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     try:
         # Update the question in the database
         update_data = regenerated_question.model_dump(exclude_none=True)
-        
+
         supabase_client.table("gen_questions").update(update_data).eq(
             "id", gen_question_id
         ).execute()
-        
+
     except Exception as e:
         logger.error(f"Error updating question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     return Response(status_code=status.HTTP_200_OK)

@@ -28,7 +28,7 @@ def test_gen_question(
     This question will have formatting issues and grammatical errors.
     """
     question_id = str(uuid.uuid4())
-    
+
     question_data = {
         "id": question_id,
         "activity_id": test_activity["id"],
@@ -47,9 +47,7 @@ def test_gen_question(
 
     # Insert question
     response = (
-        service_supabase_client.table("gen_questions")
-        .insert(question_data)
-        .execute()
+        service_supabase_client.table("gen_questions").insert(question_data).execute()
     )
 
     yield response.data[0]
@@ -93,7 +91,7 @@ class TestAutoCorrectQuestionAuth:
         Test that the endpoint returns 401 with an invalid token.
         """
         from fastapi.testclient import TestClient
-        
+
         client = TestClient(app)
         client.headers["Authorization"] = "Bearer invalid_token_here"
 
@@ -190,7 +188,10 @@ class TestAutoCorrectQuestionSuccess:
         # Verify the text was corrected (should fix "kinetc" to "kinetic")
         assert question["question_text"] is not None
         # The original text had a misspelling that should be fixed
-        assert "kinetc" not in question["question_text"].lower() or "kinetic" in question["question_text"].lower()
+        assert (
+            "kinetc" not in question["question_text"].lower()
+            or "kinetic" in question["question_text"].lower()
+        )
 
     @pytest.mark.slow
     def test_preserves_question_type_after_correction(
@@ -321,7 +322,7 @@ class TestAutoCorrectQuestionSuccess:
         # (at least some improvement from the original)
         assert corrected_text is not None
         assert len(corrected_text) > 0
-        
+
         # Should contain proper mathematical notation if applicable
         if "energy" in corrected_text.lower():
             # Energy questions should have proper formula formatting
@@ -346,7 +347,7 @@ class TestAutoCorrectQuestionEdgeCases:
         Create a test short answer question for edge case testing.
         """
         question_id = str(uuid.uuid4())
-        
+
         question_data = {
             "id": question_id,
             "activity_id": test_activity["id"],

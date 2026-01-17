@@ -28,7 +28,7 @@ def test_gen_question_for_prompt_regeneration(
     Create a test generated question in Supabase for prompt-based regeneration testing.
     """
     question_id = str(uuid.uuid4())
-    
+
     question_data = {
         "id": question_id,
         "activity_id": test_activity["id"],
@@ -47,9 +47,7 @@ def test_gen_question_for_prompt_regeneration(
 
     # Insert question
     response = (
-        service_supabase_client.table("gen_questions")
-        .insert(question_data)
-        .execute()
+        service_supabase_client.table("gen_questions").insert(question_data).execute()
     )
 
     yield response.data[0]
@@ -94,7 +92,7 @@ class TestRegenerateQuestionWithPromptAuth:
         Test that the endpoint returns 401 with an invalid token.
         """
         from fastapi.testclient import TestClient
-        
+
         client = TestClient(app)
         client.headers["Authorization"] = "Bearer invalid_token_here"
 
@@ -368,7 +366,7 @@ class TestRegenerateQuestionWithFiles:
         # Create multiple text files
         file1_content = b"Speed of light: 3 x 10^8 m/s"
         file2_content = b"Speed of sound: 343 m/s"
-        
+
         file1 = io.BytesIO(file1_content)
         file2 = io.BytesIO(file2_content)
 
@@ -427,7 +425,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
         Create a test short answer question for prompt-based regeneration testing.
         """
         question_id = str(uuid.uuid4())
-        
+
         question_data = {
             "id": question_id,
             "activity_id": test_activity["id"],
@@ -534,7 +532,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
         Test that the endpoint handles very long prompts.
         """
         question_id = test_gen_question_for_prompt_regeneration["id"]
-        
+
         # Create a long but reasonable prompt
         long_prompt = "Make this question harder. " * 50
 

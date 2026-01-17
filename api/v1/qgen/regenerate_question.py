@@ -37,10 +37,10 @@ class RegeneratedQuestion(BaseModel):
 def regenerate_question_prompt(gen_question: dict):
     """
     Generate prompt to regenerate a question.
-    
+
     Args:
         gen_question: Dictionary containing question data
-    
+
     Returns:
         Formatted prompt string
     """
@@ -61,14 +61,14 @@ def regenerate_question_logic(
 ) -> AllQuestions:
     """
     Regenerate a question using Gemini API.
-    
+
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
-    
+
     Returns:
         Regenerated question as AllQuestions type
-    
+
     Raises:
         Exception: If Gemini API call fails
     """
@@ -80,7 +80,7 @@ def regenerate_question_logic(
             "response_schema": RegeneratedQuestion,
         },
     )
-    
+
     return questions_response.parsed.question
 
 
@@ -95,11 +95,11 @@ async def regenerate_question(
 ):
     """
     API endpoint to regenerate a new question on same concept written in frontend.
-    
+
     Args:
         gen_question_id: UUID of the question to regenerate
         supabase_client: Supabase client with authentication
-    
+
     Returns:
         200 OK on success
         404 Not Found if question doesn't exist
@@ -113,18 +113,18 @@ async def regenerate_question(
             .eq("id", gen_question_id)
             .execute()
         )
-        
+
         if not gen_question.data:
             raise HTTPException(status_code=404, detail="Gen Question not found")
-        
+
         gen_question_data = gen_question.data[0]
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     try:
         # Initialize Gemini client and regenerate the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -132,21 +132,21 @@ async def regenerate_question(
             gemini_client=gemini_client,
             gen_question_data=gen_question_data,
         )
-        
+
     except Exception as e:
         logger.error(f"Error regenerating question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     try:
         # Update the question in the database
         update_data = regenerated_question.model_dump(exclude_none=True)
-        
+
         supabase_client.table("gen_questions").update(update_data).eq(
             "id", gen_question_id
         ).execute()
-        
+
     except Exception as e:
         logger.error(f"Error updating question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-    
+
     return Response(status_code=status.HTTP_200_OK)
