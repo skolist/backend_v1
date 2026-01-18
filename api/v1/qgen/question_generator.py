@@ -3,10 +3,11 @@ Consolidated Question Generator API
 All question generation logic in one place - schemas, prompts, and endpoint.
 """
 
+import asyncio
 import os
 import logging
 import uuid
-from typing import List, Literal, Dict
+from typing import List, Literal, Dict, Optional
 
 from google import genai
 from fastapi import Depends, status
@@ -125,6 +126,8 @@ class GenerateQuestionsRequest(BaseModel):
     activity_id: uuid.UUID
     concept_ids: List[uuid.UUID]
     config: QuestionConfig
+    # Optional custom instructions/prompt forwarded from the frontend UI
+    instructions: Optional[str] = None
 
 
 # ============================================================================
@@ -136,6 +139,7 @@ def generate_question_distribution_prompt(
     question_type_count_dict: TotalQuestionTypeCounts,
     concepts_list: List[str],
     old_questions_on_this_concepts: Dict[str, List[AllQuestions]],
+    instructions: Optional[str] = None,
 ) -> str:
     """Generate prompt for distributing questions across concepts."""
 
@@ -145,12 +149,18 @@ def generate_question_distribution_prompt(
     We know how much of each type of questions should be there in our distribution: {question_type_count_dict}
     Now based on this historical data of old questions, and our current total requirements of each type of questions, generate a distribution of number of questions of certain type for each concept.
     You should output the name of the concept as it is in distribution without any changes.
+    {instructions_block}
     """
+
+    instructions_block = (
+        f"Additional instructions from user, prioritize this instructions over others: {instructions}" if instructions else ""
+    )
 
     return prompt.format(
         concepts_list=concepts_list,
         old_questions_on_this_concepts=old_questions_on_this_concepts,
         question_type_count_dict=question_type_count_dict,
+        instructions_block=instructions_block,
     )
 
 
@@ -160,6 +170,7 @@ def generate_questions_prompt(
     old_questions_on_this_concept: List[AllQuestions],
     n: int,
     question_type: str,
+    instructions: Optional[str] = None,
 ) -> str:
     """Generate prompt for creating questions for a specific concept."""
 
@@ -171,7 +182,12 @@ def generate_questions_prompt(
     Be strictly within the knowledge of the concept and its description, no external knowledge is allowed.
     Strictly Use Latex format for Mathematical entities like symbols and formula etc.
     Strictly output all the fields required for the question in the format specified in the question schema. Answer Text is also compulsory , that too in latex wherever required
+    {instructions_block}
     """
+
+    instructions_block = (
+        f"Additional instructions from user, prioritize this instructions over others: {instructions}" if instructions else ""
+    )
 
     return prompt.format(
         concept=concept,
@@ -179,6 +195,7 @@ def generate_questions_prompt(
         old_questions_on_this_concept=old_questions_on_this_concept,
         n=n,
         question_type=question_type,
+        instructions_block=instructions_block,
     )
 
 
@@ -218,6 +235,7 @@ def generate_distribution(
     question_type_counts: TotalQuestionTypeCounts,
     concepts: List[Dict[str, str]],
     old_questions: List[dict],
+    instructions: Optional[str] = None,
 ) -> ConceptQuestionTypeDistribution:
     """
     Generate distribution of question types across concepts using GenAI.
@@ -237,6 +255,7 @@ def generate_distribution(
             question_type_count_dict=question_type_counts.model_dump(),
             concepts_list=concepts,
             old_questions_on_this_concepts=old_questions,
+            instructions=instructions,
         ),
         config={
             "response_mime_type": "application/json",
@@ -255,6 +274,7 @@ def generate_questions_for_distribution(
     activity_id: uuid.UUID,
     default_hardness: PublicHardnessLevelEnumEnum = PublicHardnessLevelEnumEnum.MEDIUM,
     default_marks: int = 1,
+    instructions: Optional[str] = None,
 ) -> List[Dict[str, any]]:
     """
     Generate questions based on the distribution using GenAI.
@@ -303,6 +323,7 @@ def generate_questions_for_distribution(
                     old_questions_on_this_concept=old_questions,
                     n=count,
                     question_type=question_type,
+                    instructions=instructions,
                 ),
                 config={
                     "response_mime_type": "application/json",
@@ -408,8 +429,9 @@ def generate_questions(
         distribution = generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=question_type_counts,
-            concepts=concepts,
-            old_questions=old_questions,
+                concepts=concepts,
+                old_questions=old_questions,
+                instructions=request.instructions,
         )
 
         # Step 2: Generate questions based on distribution
@@ -420,6 +442,7 @@ def generate_questions(
             concepts_name_to_id=concepts_name_to_id,
             old_questions=old_questions,
             activity_id=request.activity_id,
+            instructions=request.instructions,
         )
 
         # ====================================================================

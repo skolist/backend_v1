@@ -263,6 +263,76 @@ class TestGenerateDistribution:
         assert total_fill_in_blank == mock_question_type_counts.total_fill_in_the_blanks
         assert total_true_false == mock_question_type_counts.total_true_falses
 
+    def test_distribution_with_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_question_type_counts: TotalQuestionTypeCounts,
+        mock_concepts: List[Dict[str, str]],
+        mock_old_questions: List[dict],
+    ):
+        """
+        Test that generate_distribution accepts and uses instructions parameter.
+        """
+        instructions = "Focus on Newton's Laws more than Kinetic Energy."
+
+        result = generate_distribution(
+            gemini_client=gemini_client,
+            question_type_counts=mock_question_type_counts,
+            concepts=mock_concepts,
+            old_questions=mock_old_questions,
+            instructions=instructions,
+        )
+
+        # Verify return type is still valid
+        assert isinstance(result, ConceptQuestionTypeDistribution)
+        assert hasattr(result, "distribution")
+        assert isinstance(result.distribution, list)
+        assert len(result.distribution) > 0
+
+    def test_distribution_with_empty_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_question_type_counts: TotalQuestionTypeCounts,
+        mock_concepts: List[Dict[str, str]],
+        mock_old_questions: List[dict],
+    ):
+        """
+        Test that generate_distribution works with empty string instructions.
+        """
+        result = generate_distribution(
+            gemini_client=gemini_client,
+            question_type_counts=mock_question_type_counts,
+            concepts=mock_concepts,
+            old_questions=mock_old_questions,
+            instructions="",
+        )
+
+        # Should work normally with empty instructions
+        assert isinstance(result, ConceptQuestionTypeDistribution)
+        assert len(result.distribution) > 0
+
+    def test_distribution_with_none_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_question_type_counts: TotalQuestionTypeCounts,
+        mock_concepts: List[Dict[str, str]],
+        mock_old_questions: List[dict],
+    ):
+        """
+        Test that generate_distribution works with None instructions (default).
+        """
+        result = generate_distribution(
+            gemini_client=gemini_client,
+            question_type_counts=mock_question_type_counts,
+            concepts=mock_concepts,
+            old_questions=mock_old_questions,
+            instructions=None,
+        )
+
+        # Should work normally with None instructions
+        assert isinstance(result, ConceptQuestionTypeDistribution)
+        assert len(result.distribution) > 0
+
 
 # ============================================================================
 # TESTS FOR generate_questions_for_distribution
@@ -598,3 +668,88 @@ class TestGenerateQuestionsForDistribution:
 
         # Should return empty list since concept ID not found
         assert len(result) == 0
+
+    def test_generates_questions_with_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_distribution: ConceptQuestionTypeDistribution,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ):
+        """
+        Test that generate_questions_for_distribution accepts and uses instructions.
+        """
+        instructions = "Make questions focus on practical applications."
+
+        result = generate_questions_for_distribution(
+            gemini_client=gemini_client,
+            distribution=mock_distribution,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+            instructions=instructions,
+        )
+
+        # Should still return valid results
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+        for item in result:
+            assert isinstance(item, dict)
+            assert "question" in item
+            assert "concept_id" in item
+
+    def test_generates_questions_with_empty_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_distribution: ConceptQuestionTypeDistribution,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ):
+        """
+        Test that generate_questions_for_distribution works with empty instructions.
+        """
+        result = generate_questions_for_distribution(
+            gemini_client=gemini_client,
+            distribution=mock_distribution,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+            instructions="",
+        )
+
+        # Should work normally
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_generates_questions_with_none_instructions(
+        self,
+        gemini_client: genai.Client,
+        mock_distribution: ConceptQuestionTypeDistribution,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ):
+        """
+        Test that generate_questions_for_distribution works with None instructions.
+        """
+        result = generate_questions_for_distribution(
+            gemini_client=gemini_client,
+            distribution=mock_distribution,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+            instructions=None,
+        )
+
+        # Should work normally
+        assert isinstance(result, list)
+        assert len(result) > 0

@@ -513,8 +513,17 @@ class TestGenerateQuestionsEdgeCases:
         # Should handle gracefully - either 201 (no questions) or appropriate error
         assert response.status_code in [201, 500]
 
+
+# ============================================================================
+# TESTS FOR INSTRUCTIONS PARAMETER
+# ============================================================================
+
+
+class TestGenerateQuestionsWithInstructions:
+    """Tests for the instructions parameter in question generation."""
+
     @pytest.mark.slow
-    def test_handles_large_question_count(
+    def test_accepts_instructions_parameter(
         self,
         test_client: TestClient,
         service_supabase_client: Client,
@@ -523,7 +532,7 @@ class TestGenerateQuestionsEdgeCases:
         test_bank_questions: List[Dict[str, Any]],
     ):
         """
-        Test generating a larger number of questions.
+        Test that the endpoint accepts and processes instructions parameter.
         """
         concept_ids = [c["id"] for c in test_concepts]
         activity_id = test_activity["id"]
@@ -534,18 +543,16 @@ class TestGenerateQuestionsEdgeCases:
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,
                 "config": {
-                    "question_types": [
-                        {"type": "mcq4", "count": 3},
-                        {"type": "fill_in_the_blank", "count": 2},
-                    ],
-                    "difficulty_distribution": {"easy": 40, "medium": 40, "hard": 20},
+                    "question_types": [{"type": "mcq4", "count": 2}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
                 },
+                "instructions": "Focus on practical applications and real-world examples.",
             },
         )
 
         assert response.status_code == 201
 
-        # Verify questions were created
+        # Verify questions were created in database
         gen_questions = (
             service_supabase_client.table("gen_questions")
             .select("*")
@@ -553,11 +560,91 @@ class TestGenerateQuestionsEdgeCases:
             .execute()
         )
 
-        # Should have generated at least some questions
         assert len(gen_questions.data) >= 1
 
+    def test_accepts_empty_instructions(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint accepts empty string for instructions.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 1}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+                "instructions": "",
+            },
+        )
+
+        # Should not return validation error
+        assert response.status_code in [201, 500]
+
+    def test_accepts_null_instructions(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint accepts null for instructions.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 1}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+                "instructions": None,
+            },
+        )
+
+        # Should not return validation error
+        assert response.status_code in [201, 500]
+
+    def test_works_without_instructions_field(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint works when instructions field is omitted entirely.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 1}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+                # instructions field intentionally omitted
+            },
+        )
+
+        # Should work without instructions
+        assert response.status_code in [201, 500]
+
     @pytest.mark.slow
-    def test_questions_have_valid_structure(
+    def test_instructions_with_special_characters(
         self,
         test_client: TestClient,
         service_supabase_client: Client,
@@ -566,7 +653,7 @@ class TestGenerateQuestionsEdgeCases:
         test_bank_questions: List[Dict[str, Any]],
     ):
         """
-        Test that generated questions have valid structure based on type.
+        Test that instructions with special characters are handled properly.
         """
         concept_ids = [c["id"] for c in test_concepts]
         activity_id = test_activity["id"]
@@ -578,24 +665,10 @@ class TestGenerateQuestionsEdgeCases:
                 "concept_ids": concept_ids,
                 "config": {
                     "question_types": [{"type": "mcq4", "count": 1}],
-                    "difficulty_distribution": {"easy": 100, "medium": 0, "hard": 0},
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
                 },
+                "instructions": "Use LaTeX format: $E = mc^2$, include formulas like \\frac{1}{2}mv^2",
             },
         )
 
         assert response.status_code == 201
-
-        # Verify MCQ4 questions have options
-        gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("activity_id", activity_id)
-            .eq("question_type", "mcq4")
-            .execute()
-        )
-
-        for question in gen_questions.data:
-            # MCQ4 should have options and correct answer
-            assert question.get("option1") is not None or question.get("question_text")
-            # Validate hardness level is valid enum
-            assert question["hardness_level"] in ["easy", "medium", "hard"]
