@@ -1,14 +1,11 @@
 """
 Unit tests for auto-correct question logic.
 
-These tests use a real Gemini client to validate
-the auto_correct_question_logic function.
+These tests use a Gemini client (mock by default, real with --gemini-live)
+to validate the auto_correct_question_logic function.
 """
 
-import os
-
 import pytest
-from dotenv import load_dotenv
 import google.genai as genai
 
 from api.v1.qgen.auto_correct_question import (
@@ -21,20 +18,6 @@ from api.v1.qgen.models import MCQ4, ShortAnswer
 # ============================================================================
 # FIXTURES
 # ============================================================================
-
-
-@pytest.fixture(scope="session")
-def gemini_client() -> genai.Client:
-    """
-    Create a real Gemini client using API key from environment.
-    """
-    load_dotenv()
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        pytest.skip("GEMINI_API_KEY not set in environment")
-
-    return genai.Client(api_key=api_key)
 
 
 @pytest.fixture
@@ -117,7 +100,8 @@ class TestAutoCorrectQuestionLogic:
     """Tests for the auto_correct_question_logic function."""
 
     @pytest.mark.slow
-    def test_returns_corrected_question(
+    @pytest.mark.asyncio
+    async def test_returns_corrected_question(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -125,7 +109,7 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that auto_correct_question_logic returns a corrected question.
         """
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -136,7 +120,8 @@ class TestAutoCorrectQuestionLogic:
         assert isinstance(result.question_text, str)
 
     @pytest.mark.slow
-    def test_preserves_question_meaning(
+    @pytest.mark.asyncio
+    async def test_preserves_question_meaning(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -145,7 +130,7 @@ class TestAutoCorrectQuestionLogic:
         Test that the corrected question preserves the original meaning.
         """
         original_text = mock_mcq4_question["question_text"]
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -156,7 +141,8 @@ class TestAutoCorrectQuestionLogic:
         assert len(result.question_text) > 0
 
     @pytest.mark.slow
-    def test_corrects_mcq4_question_options(
+    @pytest.mark.asyncio
+    async def test_corrects_mcq4_question_options(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -164,7 +150,7 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that MCQ4 questions have corrected options.
         """
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -182,7 +168,8 @@ class TestAutoCorrectQuestionLogic:
             assert 1 <= result.correct_mcq_option <= 4
 
     @pytest.mark.slow
-    def test_corrects_short_answer_question(
+    @pytest.mark.asyncio
+    async def test_corrects_short_answer_question(
         self,
         gemini_client: genai.Client,
         mock_short_answer_question: dict,
@@ -190,7 +177,7 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that short answer questions are corrected properly.
         """
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
         )
@@ -201,7 +188,8 @@ class TestAutoCorrectQuestionLogic:
             assert len(result.answer_text) > 0
 
     @pytest.mark.slow
-    def test_corrects_grammar_and_formatting(
+    @pytest.mark.asyncio
+    async def test_corrects_grammar_and_formatting(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -210,7 +198,7 @@ class TestAutoCorrectQuestionLogic:
         Test that grammar and formatting are improved.
         """
         original_text = mock_mcq4_question["question_text"]
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -221,7 +209,8 @@ class TestAutoCorrectQuestionLogic:
         assert "energy" in corrected_text.lower()
 
     @pytest.mark.slow
-    def test_returns_valid_pydantic_model(
+    @pytest.mark.asyncio
+    async def test_returns_valid_pydantic_model(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -229,7 +218,7 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that the result is a valid Pydantic model.
         """
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -240,7 +229,8 @@ class TestAutoCorrectQuestionLogic:
         assert isinstance(dumped, dict)
 
     @pytest.mark.slow
-    def test_preserves_answer_structure(
+    @pytest.mark.asyncio
+    async def test_preserves_answer_structure(
         self,
         gemini_client: genai.Client,
         mock_short_answer_question: dict,
@@ -249,7 +239,7 @@ class TestAutoCorrectQuestionLogic:
         Test that corrected question preserves the answer structure.
         """
         original_answer = mock_short_answer_question["answer_text"]
-        result = auto_correct_question_logic(
+        result = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
         )

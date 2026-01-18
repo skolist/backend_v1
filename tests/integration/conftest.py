@@ -3,11 +3,15 @@ Shared fixtures for integration tests.
 
 These fixtures provide authenticated Supabase clients, test data setup/teardown,
 and FastAPI TestClient with authentication headers.
+
+By default, tests use a mock Gemini client. Use --gemini-live to test with real API.
+The --gemini-live option is defined in tests/conftest.py.
 """
 
 import os
 import uuid
 from typing import Any, Dict, Generator, List
+from unittest.mock import patch
 
 import pytest
 from dotenv import load_dotenv
@@ -16,6 +20,270 @@ from supabase import Client, create_client
 
 from app import create_app
 from supabase_dir import PublicProductTypeEnumEnum
+from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
+from api.v1.qgen.question_generator import (
+    ConceptQuestionTypeDistribution,
+    ConceptDistributionItem,
+    QuestionTypeDistribution,
+)
+
+
+# ============================================================================
+# MOCK RESPONSE FACTORIES (for integration tests)
+# ============================================================================
+
+
+def create_mock_mcq4(question_text: str | None = None) -> MCQ4:
+    """Create a mock MCQ4 question."""
+    return MCQ4(
+        question_text=question_text or "What is the formula for kinetic energy?",
+        option1="KE = m*v^2",
+        option2="KE = 1/2*m*v",
+        option3="KE = 1/2*m*v^2",
+        option4="KE = m*g*h",
+        correct_mcq_option=3,
+        explanation="The kinetic energy formula is KE = 1/2 * m * v^2",
+        answer_text="KE = 1/2*m*v^2",
+        hardness_level="medium",
+        marks=1,
+    )
+
+
+def create_mock_short_answer(question_text: str | None = None) -> ShortAnswer:
+    """Create a mock ShortAnswer question."""
+    return ShortAnswer(
+        question_text=question_text or "Explain Newton's first law of motion.",
+        answer_text="An object in motion stays in motion unless acted upon by an external force.",
+        explanation="This is the law of inertia.",
+        hardness_level="medium",
+        marks=2,
+    )
+
+
+def create_mock_true_false(question_text: str | None = None) -> TrueFalse:
+    """Create a mock TrueFalse question."""
+    return TrueFalse(
+        question_text=question_text or "Kinetic energy depends on velocity squared.",
+        correct_answer=True,
+        explanation="KE = 1/2 * m * v^2, so it depends on v squared.",
+        answer_text="True",
+        hardness_level="easy",
+        marks=1,
+    )
+
+
+def create_mock_fill_in_blank(question_text: str | None = None) -> FillInTheBlank:
+    """Create a mock FillInTheBlank question."""
+    return FillInTheBlank(
+        question_text=question_text or "The formula for kinetic energy is KE = 1/2 * m * ___",
+        answer_text="v^2",
+        explanation="Velocity squared completes the kinetic energy formula.",
+        hardness_level="medium",
+        marks=1,
+    )
+
+
+def create_mock_distribution(
+    concept_names: list[str],
+    requested_types: dict[str, int] | None = None,
+) -> ConceptQuestionTypeDistribution:
+    """
+    Create a mock distribution for the given concepts.
+    
+    Args:
+        concept_names: List of concept names
+        requested_types: Dict mapping question type to requested count.
+                        If None, defaults to mcq4 only.
+    """
+    if requested_types is None:
+        # Default to just mcq4
+        requested_types = {"mcq4": 2}
+    
+    distribution = []
+    total_concepts = len(concept_names)
+    
+    for i, name in enumerate(concept_names):
+        # Distribute questions across concepts
+        counts = QuestionTypeDistribution(
+            mcq4=0,
+            msq4=0,
+            fill_in_the_blank=0,
+            true_false=0,
+            short_answer=0,
+            long_answer=0,
+        )
+        
+        # Distribute each requested type evenly across concepts
+        for qtype, total_count in requested_types.items():
+            if total_count > 0:
+                # Give first concept the majority
+                if i == 0:
+                    count_for_concept = (total_count + total_concepts - 1) // total_concepts
+                else:
+                    count_for_concept = total_count // total_concepts
+                
+                if hasattr(counts, qtype):
+                    setattr(counts, qtype, count_for_concept)
+        
+        distribution.append(
+            ConceptDistributionItem(
+                concept_name=name,
+                question_counts=counts,
+            )
+        )
+    return ConceptQuestionTypeDistribution(distribution=distribution)
+
+
+# ============================================================================
+# MOCK GEMINI CLIENT (for integration tests)
+# ============================================================================
+
+
+class MockParsedResponse:
+    """Mock for response.parsed attribute."""
+
+    def __init__(self, parsed_obj: Any):
+        self._parsed = parsed_obj
+
+    @property
+    def parsed(self):
+        return self._parsed
+
+
+class MockQuestionsResponse:
+    """Mock for questions response with .questions attribute."""
+
+    def __init__(self, questions: list):
+        self.questions = questions
+
+
+class MockGeminiModels:
+    """Mock for gemini_client.aio.models."""
+
+    def _parse_requested_types(self, contents_str: str) -> dict[str, int]:
+        """Parse requested question types from the distribution prompt."""
+        import re
+        
+        requested = {}
+        
+        # Try to parse type counts from distribution prompt
+        # The prompt typically contains something like: 'mcq4': 2, 'true_false': 1
+        type_patterns = [
+            ("mcq4", r"'mcq4'\s*:\s*(\d+)"),
+            ("msq4", r"'msq4'\s*:\s*(\d+)"),
+            ("fill_in_the_blank", r"'fill_in_the_blank'\s*:\s*(\d+)"),
+            ("true_false", r"'true_false'\s*:\s*(\d+)"),
+            ("short_answer", r"'short_answer'\s*:\s*(\d+)"),
+            ("long_answer", r"'long_answer'\s*:\s*(\d+)"),
+        ]
+        
+        for qtype, pattern in type_patterns:
+            match = re.search(pattern, contents_str)
+            if match:
+                count = int(match.group(1))
+                if count > 0:
+                    requested[qtype] = count
+        
+        return requested if requested else {"mcq4": 2}
+
+    async def generate_content(
+        self,
+        model: str,
+        contents: Any,
+        config: dict,
+    ) -> MockParsedResponse:
+        """Mock generate_content that returns appropriate responses based on schema."""
+        schema = config.get("response_schema")
+        schema_name = getattr(schema, "__name__", str(schema))
+        contents_str = str(contents).lower()
+
+        # Handle distribution schema
+        if schema == ConceptQuestionTypeDistribution or "distribution" in schema_name.lower():
+            concept_names = ["Newton's Laws of Motion", "Kinetic Energy"]
+            requested_types = self._parse_requested_types(str(contents))
+            return MockParsedResponse(create_mock_distribution(concept_names, requested_types))
+
+        # Handle auto-correct endpoint (returns wrapper with .question)
+        if "AutoCorrected" in schema_name:
+            if "short_answer" in contents_str:
+                class QuestionWrapper:
+                    question = create_mock_short_answer("What is Newton's first law of motion?")
+                return MockParsedResponse(QuestionWrapper())
+            else:
+                class QuestionWrapper:
+                    question = create_mock_mcq4("What is the formula for kinetic energy?")
+                return MockParsedResponse(QuestionWrapper())
+
+        # Handle regenerate endpoints (returns wrapper with .question)
+        if "Regenerated" in schema_name:
+            if "short_answer" in contents_str:
+                class QuestionWrapper:
+                    question = create_mock_short_answer("Describe the principle of conservation of momentum.")
+                return MockParsedResponse(QuestionWrapper())
+            else:
+                class QuestionWrapper:
+                    question = create_mock_mcq4("Calculate the kinetic energy of a 5kg object moving at 10 m/s.")
+                return MockParsedResponse(QuestionWrapper())
+
+        # Handle question generation schemas (returns wrapper with .questions list)
+        if "mcq4" in contents_str:
+            questions = MockQuestionsResponse([create_mock_mcq4()])
+            return MockParsedResponse(questions)
+
+        if "true_false" in contents_str:
+            questions = MockQuestionsResponse([create_mock_true_false()])
+            return MockParsedResponse(questions)
+
+        if "fill_in_the_blank" in contents_str:
+            questions = MockQuestionsResponse([create_mock_fill_in_blank()])
+            return MockParsedResponse(questions)
+
+        if "short_answer" in contents_str:
+            questions = MockQuestionsResponse([create_mock_short_answer()])
+            return MockParsedResponse(questions)
+
+        # Default: return MCQ4 questions list
+        questions = MockQuestionsResponse([create_mock_mcq4()])
+        return MockParsedResponse(questions)
+
+
+class MockAioNamespace:
+    """Mock for gemini_client.aio namespace."""
+
+    def __init__(self):
+        self.models = MockGeminiModels()
+
+
+class MockGeminiClient:
+    """Mock Gemini client that mimics real client interface."""
+
+    def __init__(self, *args, **kwargs):
+        # Accept any arguments (like api_key) but ignore them
+        self.aio = MockAioNamespace()
+
+
+# ============================================================================
+# GEMINI MOCK FIXTURE (auto-applied unless --gemini-live)
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def mock_gemini_client(use_live_gemini):
+    """
+    Automatically patch genai.Client for all integration tests unless --gemini-live is used.
+    
+    This patches at the module level where genai.Client is instantiated.
+    """
+    if use_live_gemini:
+        # Use real Gemini API
+        yield
+    else:
+        # Patch genai.Client in all qgen modules
+        with patch("api.v1.qgen.question_generator.genai.Client", MockGeminiClient), \
+             patch("api.v1.qgen.auto_correct_question.genai.Client", MockGeminiClient), \
+             patch("api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient), \
+             patch("api.v1.qgen.regenerate_question_with_prompt.genai.Client", MockGeminiClient):
+            yield
 
 
 # ============================================================================
@@ -61,11 +329,15 @@ def _get_user_id(auth_response) -> str | None:
 
 
 @pytest.fixture(scope="session")
-def env() -> Dict[str, str]:
+def env(request) -> Dict[str, str]:
     """
     Load and validate required environment variables for integration tests.
+    
+    GEMINI_API_KEY is only required when --gemini-live flag is used.
     """
     load_dotenv()
+    
+    use_live_gemini = request.config.getoption("--gemini-live", default=False)
 
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
@@ -74,18 +346,20 @@ def env() -> Dict[str, str]:
     test_user_password = os.getenv("TEST_USER_PASSWORD")
     gemini_api_key = os.getenv("GEMINI_API_KEY")
 
-    missing = [
-        name
-        for name, value in [
-            ("SUPABASE_URL", supabase_url),
-            ("SUPABASE_ANON_KEY", supabase_anon_key),
-            ("SUPABASE_SERVICE_KEY", supabase_service_key),
-            ("TEST_USER_EMAIL", test_user_email),
-            ("TEST_USER_PASSWORD", test_user_password),
-            ("GEMINI_API_KEY", gemini_api_key),
-        ]
-        if not value
+    # Base required vars (always needed for Supabase)
+    required_vars = [
+        ("SUPABASE_URL", supabase_url),
+        ("SUPABASE_ANON_KEY", supabase_anon_key),
+        ("SUPABASE_SERVICE_KEY", supabase_service_key),
+        ("TEST_USER_EMAIL", test_user_email),
+        ("TEST_USER_PASSWORD", test_user_password),
     ]
+    
+    # GEMINI_API_KEY only required with --gemini-live
+    if use_live_gemini:
+        required_vars.append(("GEMINI_API_KEY", gemini_api_key))
+
+    missing = [name for name, value in required_vars if not value]
     if missing:
         pytest.skip("Missing env vars for integration tests: " + ", ".join(missing))
 
@@ -95,7 +369,7 @@ def env() -> Dict[str, str]:
         "SUPABASE_SERVICE_KEY": supabase_service_key,
         "TEST_USER_EMAIL": test_user_email,
         "TEST_USER_PASSWORD": test_user_password,
-        "GEMINI_API_KEY": gemini_api_key,
+        "GEMINI_API_KEY": gemini_api_key or "mock-api-key",  # Provide dummy value for mocks
     }
 
 

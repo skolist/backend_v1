@@ -57,7 +57,7 @@ def auto_correct_questions_prompt(gen_question: dict):
 # ============================================================================
 
 
-def auto_correct_question_logic(
+async def auto_correct_question_logic(
     gemini_client: genai.Client,
     gen_question_data: dict,
 ) -> AllQuestions:
@@ -74,7 +74,7 @@ def auto_correct_question_logic(
     Raises:
         Exception: If Gemini API call fails
     """
-    questions_response = gemini_client.models.generate_content(
+    questions_response = await gemini_client.aio.models.generate_content(
         model="gemini-3-flash-preview",
         contents=auto_correct_questions_prompt(gen_question_data),
         config={
@@ -130,7 +130,7 @@ async def auto_correct_question(
     try:
         # Initialize Gemini client and auto-correct the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        corrected_question = auto_correct_question_logic(
+        corrected_question = await auto_correct_question_logic(
             gemini_client=gemini_client,
             gen_question_data=gen_question_data,
         )

@@ -5,12 +5,10 @@ These tests use a real Gemini client with mock data to validate
 the generate_distribution and generate_questions_for_distribution functions.
 """
 
-import os
 import uuid
 from typing import Dict, List
 
 import pytest
-from dotenv import load_dotenv
 import google.genai as genai
 
 from api.v1.qgen.question_generator import (
@@ -28,20 +26,6 @@ from api.v1.qgen.question_generator import (
 # ============================================================================
 # FIXTURES
 # ============================================================================
-
-
-@pytest.fixture(scope="session")
-def gemini_client() -> genai.Client:
-    """
-    Create a real Gemini client using API key from environment.
-    """
-    load_dotenv()
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        pytest.skip("GEMINI_API_KEY not set in environment")
-
-    return genai.Client(api_key=api_key)
 
 
 @pytest.fixture
@@ -147,7 +131,8 @@ def mock_activity_id() -> uuid.UUID:
 class TestGenerateDistribution:
     """Tests for the generate_distribution function."""
 
-    def test_returns_concept_question_type_distribution(
+    @pytest.mark.asyncio
+    async def test_returns_concept_question_type_distribution(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -157,7 +142,7 @@ class TestGenerateDistribution:
         """
         Test that generate_distribution returns a valid ConceptQuestionTypeDistribution.
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -169,7 +154,8 @@ class TestGenerateDistribution:
         assert hasattr(result, "distribution")
         assert isinstance(result.distribution, list)
 
-    def test_distribution_contains_concept_names(
+    @pytest.mark.asyncio
+    async def test_distribution_contains_concept_names(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -179,7 +165,7 @@ class TestGenerateDistribution:
         """
         Test that the distribution concept names are from input.
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -197,7 +183,8 @@ class TestGenerateDistribution:
                 item.concept_name in concept_names
             ), f"Unexpected concept in distribution: {item.concept_name}"
 
-    def test_distribution_values_are_question_type_distributions(
+    @pytest.mark.asyncio
+    async def test_distribution_values_are_question_type_distributions(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -207,7 +194,7 @@ class TestGenerateDistribution:
         """
         Test that each item in the distribution has valid QuestionTypeDistribution.
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -233,7 +220,8 @@ class TestGenerateDistribution:
             assert distribution.short_answer >= 0
             assert distribution.long_answer >= 0
 
-    def test_distribution_respects_total_counts(
+    @pytest.mark.asyncio
+    async def test_distribution_respects_total_counts(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -243,7 +231,7 @@ class TestGenerateDistribution:
         """
         Test that the sum of distributed questions matches (or approximates) the total requested.
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -263,7 +251,8 @@ class TestGenerateDistribution:
         assert total_fill_in_blank == mock_question_type_counts.total_fill_in_the_blanks
         assert total_true_false == mock_question_type_counts.total_true_falses
 
-    def test_distribution_with_instructions(
+    @pytest.mark.asyncio
+    async def test_distribution_with_instructions(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -275,7 +264,7 @@ class TestGenerateDistribution:
         """
         instructions = "Focus on Newton's Laws more than Kinetic Energy."
 
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -289,7 +278,8 @@ class TestGenerateDistribution:
         assert isinstance(result.distribution, list)
         assert len(result.distribution) > 0
 
-    def test_distribution_with_empty_instructions(
+    @pytest.mark.asyncio
+    async def test_distribution_with_empty_instructions(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -299,7 +289,7 @@ class TestGenerateDistribution:
         """
         Test that generate_distribution works with empty string instructions.
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -311,7 +301,8 @@ class TestGenerateDistribution:
         assert isinstance(result, ConceptQuestionTypeDistribution)
         assert len(result.distribution) > 0
 
-    def test_distribution_with_none_instructions(
+    @pytest.mark.asyncio
+    async def test_distribution_with_none_instructions(
         self,
         gemini_client: genai.Client,
         mock_question_type_counts: TotalQuestionTypeCounts,
@@ -321,7 +312,7 @@ class TestGenerateDistribution:
         """
         Test that generate_distribution works with None instructions (default).
         """
-        result = generate_distribution(
+        result = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=mock_question_type_counts,
             concepts=mock_concepts,
@@ -376,7 +367,8 @@ class TestGenerateQuestionsForDistribution:
             ]
         )
 
-    def test_returns_list_of_dicts(
+    @pytest.mark.asyncio
+    async def test_returns_list_of_dicts(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -388,7 +380,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that generate_questions_for_distribution returns a list of dicts.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -405,7 +397,8 @@ class TestGenerateQuestionsForDistribution:
             assert "question" in item
             assert "concept_id" in item
 
-    def test_question_dict_has_required_fields(
+    @pytest.mark.asyncio
+    async def test_question_dict_has_required_fields(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -417,7 +410,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that each generated question dict has required fields.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -441,7 +434,8 @@ class TestGenerateQuestionsForDistribution:
             # Verify question_type is a valid enum
             assert question["question_type"] in QUESTION_TYPE_TO_ENUM.values()
 
-    def test_concept_ids_are_valid(
+    @pytest.mark.asyncio
+    async def test_concept_ids_are_valid(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -453,7 +447,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that concept IDs in results match our input concepts.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -467,7 +461,8 @@ class TestGenerateQuestionsForDistribution:
         for item in result:
             assert item["concept_id"] in valid_concept_ids
 
-    def test_generates_correct_number_of_questions(
+    @pytest.mark.asyncio
+    async def test_generates_correct_number_of_questions(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -479,7 +474,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that the number of generated questions matches the distribution.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -501,7 +496,8 @@ class TestGenerateQuestionsForDistribution:
 
         assert len(result) == expected_total
 
-    def test_uses_default_hardness_level(
+    @pytest.mark.asyncio
+    async def test_uses_default_hardness_level(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -513,7 +509,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that default hardness level is applied.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -527,7 +523,8 @@ class TestGenerateQuestionsForDistribution:
                 item["question"]["hardness_level"] == PublicHardnessLevelEnumEnum.MEDIUM
             )
 
-    def test_custom_hardness_level(
+    @pytest.mark.asyncio
+    async def test_custom_hardness_level(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -541,7 +538,7 @@ class TestGenerateQuestionsForDistribution:
         """
         custom_hardness = PublicHardnessLevelEnumEnum.HARD
 
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -554,7 +551,8 @@ class TestGenerateQuestionsForDistribution:
         for item in result:
             assert item["question"]["hardness_level"] == custom_hardness
 
-    def test_custom_marks(
+    @pytest.mark.asyncio
+    async def test_custom_marks(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -568,7 +566,7 @@ class TestGenerateQuestionsForDistribution:
         """
         custom_marks = 5
 
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -581,7 +579,8 @@ class TestGenerateQuestionsForDistribution:
         for item in result:
             assert item["question"]["marks"] == custom_marks
 
-    def test_mcq4_questions_have_options(
+    @pytest.mark.asyncio
+    async def test_mcq4_questions_have_options(
         self,
         gemini_client: genai.Client,
         mock_concepts_dict: Dict[str, str],
@@ -610,7 +609,7 @@ class TestGenerateQuestionsForDistribution:
             ]
         )
 
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mcq_only_distribution,
             concepts_dict=mock_concepts_dict,
@@ -629,7 +628,8 @@ class TestGenerateQuestionsForDistribution:
         assert "option4" in question
         assert "correct_mcq_option" in question
 
-    def test_skips_unknown_concepts(
+    @pytest.mark.asyncio
+    async def test_skips_unknown_concepts(
         self,
         gemini_client: genai.Client,
         mock_concepts_dict: Dict[str, str],
@@ -657,7 +657,7 @@ class TestGenerateQuestionsForDistribution:
         )
 
         # Empty concepts_name_to_id means no valid concepts
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=distribution_with_unknown,
             concepts_dict=mock_concepts_dict,
@@ -669,7 +669,8 @@ class TestGenerateQuestionsForDistribution:
         # Should return empty list since concept ID not found
         assert len(result) == 0
 
-    def test_generates_questions_with_instructions(
+    @pytest.mark.asyncio
+    async def test_generates_questions_with_instructions(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -683,7 +684,7 @@ class TestGenerateQuestionsForDistribution:
         """
         instructions = "Make questions focus on practical applications."
 
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -702,7 +703,8 @@ class TestGenerateQuestionsForDistribution:
             assert "question" in item
             assert "concept_id" in item
 
-    def test_generates_questions_with_empty_instructions(
+    @pytest.mark.asyncio
+    async def test_generates_questions_with_empty_instructions(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -714,7 +716,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that generate_questions_for_distribution works with empty instructions.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,
@@ -728,7 +730,8 @@ class TestGenerateQuestionsForDistribution:
         assert isinstance(result, list)
         assert len(result) > 0
 
-    def test_generates_questions_with_none_instructions(
+    @pytest.mark.asyncio
+    async def test_generates_questions_with_none_instructions(
         self,
         gemini_client: genai.Client,
         mock_distribution: ConceptQuestionTypeDistribution,
@@ -740,7 +743,7 @@ class TestGenerateQuestionsForDistribution:
         """
         Test that generate_questions_for_distribution works with None instructions.
         """
-        result = generate_questions_for_distribution(
+        result = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=mock_distribution,
             concepts_dict=mock_concepts_dict,

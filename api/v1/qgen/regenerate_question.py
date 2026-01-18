@@ -55,7 +55,7 @@ def regenerate_question_prompt(gen_question: dict):
 # ============================================================================
 
 
-def regenerate_question_logic(
+async def regenerate_question_logic(
     gemini_client: genai.Client,
     gen_question_data: dict,
 ) -> AllQuestions:
@@ -72,7 +72,7 @@ def regenerate_question_logic(
     Raises:
         Exception: If Gemini API call fails
     """
-    questions_response = gemini_client.models.generate_content(
+    questions_response = await gemini_client.aio.models.generate_content(
         model="gemini-3-flash-preview",
         contents=regenerate_question_prompt(gen_question_data),
         config={
@@ -128,7 +128,7 @@ async def regenerate_question(
     try:
         # Initialize Gemini client and regenerate the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        regenerated_question = regenerate_question_logic(
+        regenerated_question = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=gen_question_data,
         )

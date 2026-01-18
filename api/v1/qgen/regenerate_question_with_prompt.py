@@ -151,7 +151,7 @@ async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
 # ============================================================================
 
 
-def regenerate_question_with_prompt_logic(
+async def regenerate_question_with_prompt_logic(
     gemini_client: genai.Client,
     gen_question_data: dict,
     custom_prompt: Optional[str] = None,
@@ -189,7 +189,7 @@ def regenerate_question_with_prompt_logic(
     contents.append(types.Part.from_text(text=prompt_text))
 
     # Generate response
-    questions_response = gemini_client.models.generate_content(
+    questions_response = await gemini_client.aio.models.generate_content(
         model="gemini-2.0-flash",
         contents=contents,
         config={
@@ -257,7 +257,7 @@ async def regenerate_question_with_prompt(
 
         # Initialize Gemini client and regenerate the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        regenerated_question = regenerate_question_with_prompt_logic(
+        regenerated_question = await regenerate_question_with_prompt_logic(
             gemini_client=gemini_client,
             gen_question_data=gen_question_data,
             custom_prompt=prompt,

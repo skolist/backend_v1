@@ -1,14 +1,11 @@
 """
 Unit tests for regenerate question logic.
 
-These tests use a real Gemini client to validate
-the regenerate_question_logic function.
+These tests use a Gemini client (mock by default, real with --gemini-live)
+to validate the regenerate_question_logic function.
 """
 
-import os
-
 import pytest
-from dotenv import load_dotenv
 import google.genai as genai
 
 from api.v1.qgen.regenerate_question import (
@@ -21,20 +18,6 @@ from api.v1.qgen.models import MCQ4, ShortAnswer
 # ============================================================================
 # FIXTURES
 # ============================================================================
-
-
-@pytest.fixture(scope="session")
-def gemini_client() -> genai.Client:
-    """
-    Create a real Gemini client using API key from environment.
-    """
-    load_dotenv()
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        pytest.skip("GEMINI_API_KEY not set in environment")
-
-    return genai.Client(api_key=api_key)
 
 
 @pytest.fixture
@@ -116,7 +99,8 @@ class TestRegenerateQuestionLogic:
     """Tests for the regenerate_question_logic function."""
 
     @pytest.mark.slow
-    def test_returns_regenerated_question(
+    @pytest.mark.asyncio
+    async def test_returns_regenerated_question(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -124,7 +108,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that regenerate_question_logic returns a regenerated question.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -135,7 +119,8 @@ class TestRegenerateQuestionLogic:
         assert isinstance(result.question_text, str)
 
     @pytest.mark.slow
-    def test_regenerated_question_is_different(
+    @pytest.mark.asyncio
+    async def test_regenerated_question_is_different(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -144,7 +129,7 @@ class TestRegenerateQuestionLogic:
         Test that the regenerated question is different from the original.
         """
         original_text = mock_mcq4_question["question_text"]
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -157,7 +142,8 @@ class TestRegenerateQuestionLogic:
         # so we just verify it's a valid question
 
     @pytest.mark.slow
-    def test_regenerates_mcq4_question_with_options(
+    @pytest.mark.asyncio
+    async def test_regenerates_mcq4_question_with_options(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -165,7 +151,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that regenerated MCQ4 questions have valid options.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -183,7 +169,8 @@ class TestRegenerateQuestionLogic:
             assert 1 <= result.correct_mcq_option <= 4
 
     @pytest.mark.slow
-    def test_regenerates_short_answer_question(
+    @pytest.mark.asyncio
+    async def test_regenerates_short_answer_question(
         self,
         gemini_client: genai.Client,
         mock_short_answer_question: dict,
@@ -191,7 +178,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that short answer questions are regenerated properly.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
         )
@@ -202,7 +189,8 @@ class TestRegenerateQuestionLogic:
             assert len(result.answer_text) > 0
 
     @pytest.mark.slow
-    def test_preserves_same_concept(
+    @pytest.mark.asyncio
+    async def test_preserves_same_concept(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -210,7 +198,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that the regenerated question is about the same concept.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -224,7 +212,8 @@ class TestRegenerateQuestionLogic:
         )
 
     @pytest.mark.slow
-    def test_returns_valid_pydantic_model(
+    @pytest.mark.asyncio
+    async def test_returns_valid_pydantic_model(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -232,7 +221,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that the result is a valid Pydantic model.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )
@@ -243,7 +232,8 @@ class TestRegenerateQuestionLogic:
         assert isinstance(dumped, dict)
 
     @pytest.mark.slow
-    def test_regenerated_question_has_explanation(
+    @pytest.mark.asyncio
+    async def test_regenerated_question_has_explanation(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
@@ -251,7 +241,7 @@ class TestRegenerateQuestionLogic:
         """
         Test that the regenerated question includes an explanation.
         """
-        result = regenerate_question_logic(
+        result = await regenerate_question_logic(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
         )

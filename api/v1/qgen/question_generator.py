@@ -230,7 +230,7 @@ def extract_total_question_type_counts(
 # ============================================================================
 
 
-def generate_distribution(
+async def generate_distribution(
     gemini_client: genai.Client,
     question_type_counts: TotalQuestionTypeCounts,
     concepts: List[Dict[str, str]],
@@ -249,7 +249,7 @@ def generate_distribution(
     Returns:
         ConceptQuestionTypeDistribution with question counts per concept
     """
-    response = gemini_client.models.generate_content(
+    response = await gemini_client.aio.models.generate_content(
         model="gemini-3-flash-preview",
         contents=generate_question_distribution_prompt(
             question_type_count_dict=question_type_counts.model_dump(),
@@ -265,7 +265,7 @@ def generate_distribution(
     return response.parsed
 
 
-def generate_questions_for_distribution(
+async def generate_questions_for_distribution(
     gemini_client: genai.Client,
     distribution: ConceptQuestionTypeDistribution,
     concepts_dict: Dict[str, str],
@@ -278,6 +278,9 @@ def generate_questions_for_distribution(
 ) -> List[Dict[str, any]]:
     """
     Generate questions based on the distribution using GenAI.
+    
+    Uses async parallelization to make concurrent API calls for each question type,
+    significantly reducing total execution time for network-bound operations.
 
     Args:
         gemini_client: Initialized Gemini client
@@ -292,30 +295,24 @@ def generate_questions_for_distribution(
     Returns:
         List of dicts with 'question' (GenQuestionsInsert-compatible) and 'concept_id'
     """
-    gen_questions_data: List[Dict[str, any]] = []
-
-    for concept_item in distribution.distribution:
-        concept_name = concept_item.concept_name
-        question_type_count = concept_item.question_counts
-
-        concept_id = concepts_name_to_id.get(concept_name)
-        if not concept_id:
-            logger.warning(f"Concept ID not found for: {concept_name}")
-            continue
-
-        for question_type, count in question_type_count.model_dump().items():
-            if count == 0:
-                continue
-
-            # Get the appropriate schema for this question type
-            question_schema = QUESTION_TYPE_TO_SCHEMA.get(question_type)
-            question_type_enum = QUESTION_TYPE_TO_ENUM.get(question_type)
-            if not question_schema or not question_type_enum:
-                logger.warning(f"Unknown question type: {question_type}")
-                continue
-
-            # Generate questions for this concept and type
-            questions_response = gemini_client.models.generate_content(
+    
+    async def generate_questions_for_type(
+        concept_name: str,
+        concept_id: str,
+        question_type: str,
+        count: int,
+    ) -> List[Dict[str, any]]:
+        """Generate questions for a specific concept and question type."""
+        question_schema = QUESTION_TYPE_TO_SCHEMA.get(question_type)
+        question_type_enum = QUESTION_TYPE_TO_ENUM.get(question_type)
+        
+        if not question_schema or not question_type_enum:
+            logger.warning(f"Unknown question type: {question_type}")
+            return []
+        
+        try:
+            # Use async API call for parallel execution
+            questions_response = await gemini_client.aio.models.generate_content(
                 model="gemini-3-flash-preview",
                 contents=generate_questions_prompt(
                     concept=concept_name,
@@ -330,23 +327,56 @@ def generate_questions_for_distribution(
                     "response_schema": question_schema,
                 },
             )
-            try:
-                for q in questions_response.parsed.questions:
-                    gen_question_dict = {
-                        **q.model_dump(),
-                        "activity_id": str(activity_id),
-                        "question_type": question_type_enum,
-                        "hardness_level": default_hardness,
-                        "marks": default_marks,
-                    }
-                    gen_questions_data.append(
-                        {
-                            "question": gen_question_dict,
-                            "concept_id": concept_id,
-                        }
-                    )
-            except Exception as e:
-                logger.error(f"Error parsing questions response: {e}", exc_info=True)
+            
+            results = []
+            for q in questions_response.parsed.questions:
+                gen_question_dict = {
+                    **q.model_dump(),
+                    "activity_id": str(activity_id),
+                    "question_type": question_type_enum,
+                    "hardness_level": default_hardness,
+                    "marks": default_marks,
+                }
+                results.append({
+                    "question": gen_question_dict,
+                    "concept_id": concept_id,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Error parsing questions response for {concept_name}/{question_type}: {e}", exc_info=True)
+            return []
+
+    # Collect all tasks for parallel execution
+    tasks = []
+    for concept_item in distribution.distribution:
+        concept_name = concept_item.concept_name
+        question_type_count = concept_item.question_counts
+
+        concept_id = concepts_name_to_id.get(concept_name)
+        if not concept_id:
+            logger.warning(f"Concept ID not found for: {concept_name}")
+            continue
+
+        for question_type, count in question_type_count.model_dump().items():
+            if count == 0:
+                continue
+            
+            tasks.append(
+                generate_questions_for_type(
+                    concept_name=concept_name,
+                    concept_id=concept_id,
+                    question_type=question_type,
+                    count=count,
+                )
+            )
+
+    # Execute all API calls in parallel
+    results = await asyncio.gather(*tasks)
+    
+    # Flatten results
+    gen_questions_data: List[Dict[str, any]] = []
+    for result in results:
+        gen_questions_data.extend(result)
 
     return gen_questions_data
 
@@ -356,7 +386,7 @@ def generate_questions_for_distribution(
 # ============================================================================
 
 
-def generate_questions(
+async def generate_questions(
     request: GenerateQuestionsRequest,
     supabase_client: supabase.Client = Depends(get_supabase_client),
 ) -> Response:
@@ -366,7 +396,7 @@ def generate_questions(
     This endpoint orchestrates:
     1. Fetches concepts and historical questions from Supabase
     2. Calls generate_distribution() to get question distribution
-    3. Calls generate_questions_for_distribution() to create questions
+    3. Calls generate_questions_for_distribution() to create questions (parallelized)
     4. Inserts generated questions into gen_questions table
     5. Creates concept-question mappings in gen_questions_concepts_maps table
 
@@ -425,17 +455,17 @@ def generate_questions(
         # Initialize Gemini client
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-        # Step 1: Generate distribution
-        distribution = generate_distribution(
+        # Step 1: Generate distribution (async)
+        distribution = await generate_distribution(
             gemini_client=gemini_client,
             question_type_counts=question_type_counts,
-                concepts=concepts,
-                old_questions=old_questions,
-                instructions=request.instructions,
+            concepts=concepts,
+            old_questions=old_questions,
+            instructions=request.instructions,
         )
 
-        # Step 2: Generate questions based on distribution
-        gen_questions_data = generate_questions_for_distribution(
+        # Step 2: Generate questions based on distribution (parallelized)
+        gen_questions_data = await generate_questions_for_distribution(
             gemini_client=gemini_client,
             distribution=distribution,
             concepts_dict=concepts_dict,
