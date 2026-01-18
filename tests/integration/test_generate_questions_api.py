@@ -68,7 +68,7 @@ class TestGenerateQuestionsAuth:
         concept_ids = [c["id"] for c in test_concepts]
 
         response = unauthenticated_test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": concept_ids,
@@ -96,7 +96,7 @@ class TestGenerateQuestionsAuth:
         concept_ids = [c["id"] for c in test_concepts]
 
         response = client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": concept_ids,
@@ -129,7 +129,7 @@ class TestGenerateQuestionsValidation:
         concept_ids = [c["id"] for c in test_concepts]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": "not-a-valid-uuid",
                 "concept_ids": concept_ids,
@@ -154,7 +154,7 @@ class TestGenerateQuestionsValidation:
         concept_ids = [c["id"] for c in test_concepts]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": concept_ids,
@@ -179,7 +179,7 @@ class TestGenerateQuestionsValidation:
         concept_ids = [c["id"] for c in test_concepts]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": concept_ids,
@@ -197,7 +197,7 @@ class TestGenerateQuestionsValidation:
         Test that the endpoint handles empty concept_ids list.
         """
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": [],
@@ -212,6 +212,117 @@ class TestGenerateQuestionsValidation:
         # or 500 if the implementation doesn't handle empty list gracefully
         # Note: 500 indicates a bug in the endpoint that should be fixed
         assert response.status_code in [201, 422, 500]
+
+    def test_returns_422_when_total_questions_is_zero(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint returns 422 when total questions is 0.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 0}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+            },
+        )
+
+        assert response.status_code == 422
+        assert "Total number of questions must be between 1 and 50" in response.text
+
+    def test_returns_422_when_total_questions_exceeds_50(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint returns 422 when total questions exceeds 50.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [
+                        {"type": "mcq4", "count": 30},
+                        {"type": "short_answer", "count": 21},
+                    ],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+            },
+        )
+
+        assert response.status_code == 422
+        assert "Total number of questions must be between 1 and 50" in response.text
+
+    def test_accepts_exactly_1_question(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint accepts exactly 1 question (lower boundary).
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 1}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+            },
+        )
+
+        # Should not return validation error (422)
+        assert response.status_code in [201, 500]
+
+    def test_accepts_exactly_50_questions(
+        self,
+        test_client: TestClient,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+    ):
+        """
+        Test that the endpoint accepts exactly 50 questions (upper boundary).
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": test_activity["id"],
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [
+                        {"type": "mcq4", "count": 20},
+                        {"type": "short_answer", "count": 15},
+                        {"type": "true_false", "count": 15},
+                    ],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+            },
+        )
+
+        # Should not return validation error (422)
+        assert response.status_code in [201, 500]
 
 
 # ============================================================================
@@ -238,7 +349,7 @@ class TestGenerateQuestionsSuccess:
         activity_id = test_activity["id"]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,
@@ -284,7 +395,7 @@ class TestGenerateQuestionsSuccess:
         activity_id = test_activity["id"]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,
@@ -328,7 +439,7 @@ class TestGenerateQuestionsSuccess:
         activity_id = test_activity["id"]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,
@@ -388,7 +499,7 @@ class TestGenerateQuestionsEdgeCases:
         fake_concept_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": test_activity["id"],
                 "concept_ids": fake_concept_ids,
@@ -418,7 +529,7 @@ class TestGenerateQuestionsEdgeCases:
         activity_id = test_activity["id"]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,
@@ -461,7 +572,7 @@ class TestGenerateQuestionsEdgeCases:
         activity_id = test_activity["id"]
 
         response = test_client.post(
-            "/api/v1/generate/questions",
+            "/api/v1/qgen/generate_questions",
             json={
                 "activity_id": activity_id,
                 "concept_ids": concept_ids,

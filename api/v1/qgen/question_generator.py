@@ -11,7 +11,7 @@ from typing import List, Literal, Dict
 from google import genai
 from fastapi import Depends, status
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import supabase
 
 from api.v1.auth import get_supabase_client
@@ -109,6 +109,14 @@ class QuestionConfig(BaseModel):
 
     question_types: List[QuestionTypeConfig]
     difficulty_distribution: DifficultyDistribution
+
+    @model_validator(mode="after")
+    def check_total_questions(self) -> "QuestionConfig":
+        """Ensure total questions across all types is between 1 and 50."""
+        total = sum(q.count for q in self.question_types)
+        if total < 1 or total > 50:
+            raise ValueError("Total number of questions must be between 1 and 50.")
+        return self
 
 
 class GenerateQuestionsRequest(BaseModel):
