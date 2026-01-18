@@ -162,6 +162,7 @@ def generate_questions_prompt(
     The questions should be based on the concept and its description, and the old questions. Try to align with the patterns in the old questions.
     Be strictly within the knowledge of the concept and its description, no external knowledge is allowed.
     Strictly Use Latex format for Mathematical entities like symbols and formula etc.
+    Strictly output all the fields required for the question in the format specified in the question schema. Answer Text is also compulsory , that too in latex wherever required
     """
 
     return prompt.format(
