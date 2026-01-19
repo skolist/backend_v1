@@ -9,18 +9,26 @@ Architecture:
 
 import os
 import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 import supabase
 from pydantic import BaseModel, Field
 
 from google import genai
-from fastapi import Depends, status, HTTPException
+from google.genai import types
+from fastapi import Depends, status, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
 from .models import AllQuestions
 
 logger = logging.getLogger(__name__)
+
+# Image logging configuration
+LOG_IMAGES = os.getenv("LOG_IMAGES", "false").lower() == "true"
+IMAGES_LOG_DIR = Path(__file__).parent.parent.parent.parent / "logs" / "images"
 
 # ============================================================================
 # SCHEMAS
@@ -87,12 +95,113 @@ def auto_correct_questions_prompt(gen_question: dict) -> str:
     There may be some grammatical errors in it. Please correct it, don't change anything related to the meaning 
     of the question itself. Return the corrected question in the same format.
     If user has requested something, then there must be something like either grammatical or latex error. High probability that it is latex error in maths question, so check the question carefully.
+    If an image is attached, use it to help understand and correct the question content.
     Common Latex Errors are:
         1] Not placing inside $$ symbols
         Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
             If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
         2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
     """
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+
+async def save_image_for_debug(
+    image_content: bytes,
+    gen_question_id: str,
+    content_type: str,
+) -> Optional[str]:
+    """
+    Save image to logs/images directory for debugging purposes.
+
+    Only saves when LOG_IMAGES env var is true and logging level is DEBUG.
+
+    Args:
+        image_content: Raw image bytes
+        gen_question_id: Question ID for filename
+        content_type: MIME type of the image
+
+    Returns:
+        Path to saved image file, or None if not saved
+    """
+    if not LOG_IMAGES or logger.level > logging.DEBUG:
+        return None
+
+    try:
+        # Create images log directory if it doesn't exist
+        IMAGES_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Determine file extension from content type
+        ext_map = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+        }
+        ext = ext_map.get(content_type, ".png")
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"auto_correct_{gen_question_id}_{timestamp}{ext}"
+        filepath = IMAGES_LOG_DIR / filename
+
+        # Save the image
+        filepath.write_bytes(image_content)
+
+        logger.debug(
+            "Saved debug image",
+            extra={
+                "filepath": str(filepath),
+                "size_bytes": len(image_content),
+                "content_type": content_type,
+            },
+        )
+
+        return str(filepath)
+
+    except Exception as e:
+        logger.warning(
+            "Failed to save debug image",
+            extra={"error": str(e)},
+        )
+        return None
+
+
+async def process_uploaded_image(
+    image: UploadFile,
+    gen_question_id: str = None,
+) -> Optional[types.Part]:
+    """
+    Process uploaded image and convert it to a Gemini Part object.
+
+    Args:
+        image: Uploaded image file
+        gen_question_id: Optional question ID for debug logging
+
+    Returns:
+        Gemini Part object for the image, or None if no valid image
+    """
+    if not image or not image.filename or not image.size or image.size == 0:
+        return None
+
+    content = await image.read()
+    content_type = image.content_type or "image/jpeg"
+
+    # Save image for debugging if enabled
+    if gen_question_id:
+        await save_image_for_debug(content, gen_question_id, content_type)
+
+    # Reset file pointer for potential re-reads
+    await image.seek(0)
+
+    return types.Part.from_bytes(
+        data=content,
+        mime_type=content_type,
+    )
 
 
 # ============================================================================
@@ -103,6 +212,7 @@ def auto_correct_questions_prompt(gen_question: dict) -> str:
 async def process_question(
     gemini_client: genai.Client,
     gen_question_data: dict,
+    image_part: Optional[types.Part] = None,
     retry_idx: int = None,
 ) -> dict:
     """
@@ -113,6 +223,7 @@ async def process_question(
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
+        image_part: Optional Gemini Part object for attached image
         retry_idx: Current retry attempt number (for logging)
 
     Returns:
@@ -130,6 +241,20 @@ async def process_question(
 
     prompt = auto_correct_questions_prompt(gen_question_data)
 
+    # Build content parts
+    contents = []
+
+    # Add image part first (if any) so the model can reference it
+    if image_part:
+        logger.debug(
+            "Adding image part to request",
+            extra={"retry_idx": retry_idx},
+        )
+        contents.append(image_part)
+
+    # Add the text prompt
+    contents.append(types.Part.from_text(text=prompt))
+
     logger.debug(
         "Making Gemini API call",
         extra={"retry_idx": retry_idx},
@@ -138,7 +263,7 @@ async def process_question(
     # Single API call - no retries here
     response = await gemini_client.aio.models.generate_content(
         model="gemini-2.5-flash",
-        contents=prompt,
+        contents=contents,
         config={
             "response_mime_type": "application/json",
             "response_schema": AutoCorrectedQuestion,
@@ -164,6 +289,7 @@ async def process_question(
 async def process_question_and_validate(
     gemini_client: genai.Client,
     gen_question_data: dict,
+    image_part: Optional[types.Part] = None,
     retry_idx: int = None,
 ) -> AllQuestions:
     """
@@ -174,6 +300,7 @@ async def process_question_and_validate(
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
+        image_part: Optional Gemini Part object for attached image
         retry_idx: Current retry attempt number (for logging)
 
     Returns:
@@ -191,7 +318,9 @@ async def process_question_and_validate(
     )
 
     # Step 1: Get response from Gemini
-    response = await process_question(gemini_client, gen_question_data, retry_idx)
+    response = await process_question(
+        gemini_client, gen_question_data, image_part, retry_idx
+    )
 
     # Step 2: Parse and validate response
     logger.debug(
@@ -241,6 +370,7 @@ async def try_retry_and_update(
     gen_question_data: dict,
     gen_question_id: str,
     supabase_client: supabase.Client,
+    image_part: Optional[types.Part] = None,
     max_retries: int = 5,
 ) -> bool:
     """
@@ -254,6 +384,7 @@ async def try_retry_and_update(
         gen_question_data: Dictionary containing question data
         gen_question_id: UUID of the question to update
         supabase_client: Supabase client for database operations
+        image_part: Optional Gemini Part object for attached image
         max_retries: Maximum number of retry attempts (default: 5)
 
     Returns:
@@ -283,7 +414,7 @@ async def try_retry_and_update(
             )
 
             corrected_question = await process_question_and_validate(
-                gemini_client, gen_question_data, retry_idx
+                gemini_client, gen_question_data, image_part, retry_idx
             )
 
             logger.debug(
@@ -339,7 +470,10 @@ async def try_retry_and_update(
 
 
 async def auto_correct_question(
-    gen_question_id: str,
+    gen_question_id: str = Form(..., description="UUID of the question to correct"),
+    image: Optional[UploadFile] = File(
+        default=None, description="Optional image to attach for context"
+    ),
     supabase_client: supabase.Client = Depends(get_supabase_client),
 ):
     """
@@ -347,6 +481,7 @@ async def auto_correct_question(
 
     Args:
         gen_question_id: UUID of the question to correct
+        image: Optional image file to attach for context
         supabase_client: Supabase client with authentication
 
     Returns:
@@ -356,7 +491,10 @@ async def auto_correct_question(
     """
     logger.info(
         "Received auto-correct request",
-        extra={"gen_question_id": gen_question_id},
+        extra={
+            "gen_question_id": gen_question_id,
+            "has_image": image is not None and image.filename is not None,
+        },
     )
 
     # Fetch the question from the database
@@ -391,6 +529,18 @@ async def auto_correct_question(
 
     # Process and update question
     try:
+        # Process uploaded image if provided
+        image_part = None
+        if image:
+            logger.debug(
+                "Processing uploaded image",
+                extra={
+                    "gen_question_id": gen_question_id,
+                    "image_filename": image.filename,
+                },
+            )
+            image_part = await process_uploaded_image(image, gen_question_id)
+
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
         await try_retry_and_update(
@@ -398,6 +548,7 @@ async def auto_correct_question(
             gen_question_data=gen_question_data,
             gen_question_id=gen_question_id,
             supabase_client=supabase_client,
+            image_part=image_part,
             max_retries=5,
         )
 

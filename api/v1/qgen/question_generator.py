@@ -163,7 +163,7 @@ def generate_questions_prompt(
     concepts_text = "\n".join(concept_info)
 
     instructions_block = (
-        f"\nAdditional user instructions (prioritize these): {instructions}"
+        f"\nAdditional user instructions (prioritize these over anything concepts selected or difficulty or marks or anything): {instructions}"
         if instructions
         else ""
     )

@@ -4,10 +4,13 @@ Contains the logic to batchify question generation requests based on various par
 
 from __future__ import annotations
 
+import logging
+import math
+import random
 from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
-import random
-import math
+
+logger = logging.getLogger(__name__)
 
 
 # ----------------------------
@@ -135,12 +138,30 @@ def _apply_custom_instruction_fraction(
     n = len(batches)
     k = int(round(n * fraction))
 
+    logger.debug(
+        "Applying custom instruction fraction",
+        extra={
+            "total_batches": n,
+            "batches_with_instruction": k,
+            "fraction": fraction,
+            "mode": mode,
+        },
+    )
+
     if k <= 0:
+        logger.debug(
+            "No batches will receive custom instructions",
+            extra={"reason": "k <= 0"},
+        )
         return [
             Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, None)
             for b in batches
         ]
     if k >= n:
+        logger.debug(
+            "All batches will receive custom instructions",
+            extra={"reason": "k >= n"},
+        )
         return [
             Batch(
                 b.question_type,
@@ -159,6 +180,17 @@ def _apply_custom_instruction_fraction(
         raise ValueError("mode must be 'first' or 'random'")
 
     chosen = set(idxs[:k])
+
+    # Log which batch numbers (1-indexed) will receive custom instructions
+    batches_with_instructions = sorted([i + 1 for i in chosen])
+    logger.debug(
+        "Custom instruction distribution",
+        extra={
+            "batch_numbers_with_instruction": batches_with_instructions,
+            "batch_count_with_instruction": len(batches_with_instructions),
+        },
+    )
+
     updated: List[Batch] = []
     for i, b in enumerate(batches):
         ci = custom_instruction_value if i in chosen else None
@@ -339,5 +371,16 @@ def build_batches_end_to_end(
 
     if not all(len(b.concepts) >= 1 for b in batches):
         raise RuntimeError("Internal error: zero-concept batch exists.")
+
+    # Log final batch summary
+    logger.debug(
+        "Batchification complete",
+        extra={
+            "total_batches": len(batches),
+            "total_questions": total_questions,
+            "question_types": [qt for qt, _ in active_types],
+            "has_custom_instruction": custom_instruction is not None,
+        },
+    )
 
     return batches
