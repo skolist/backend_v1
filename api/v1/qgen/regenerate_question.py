@@ -18,6 +18,7 @@ from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
 from .models import AllQuestions
+from .prompts import regenerate_question_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -63,33 +64,6 @@ def _log_prefix(retry_idx: int = None) -> str:
     if retry_idx is not None:
         return f"RETRY:{retry_idx} | "
     return ""
-
-
-# ============================================================================
-# PROMPT FUNCTIONS
-# ============================================================================
-
-
-def regenerate_question_prompt(gen_question: dict) -> str:
-    """
-    Generate prompt to regenerate a question.
-
-    Args:
-        gen_question: Dictionary containing question data
-
-    Returns:
-        Formatted prompt string
-    """
-    # Using f-string to avoid issues with curly braces in LaTeX
-    return f"""
-    You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
-    
-    Common Latex Errors are:
-        1] Not placing inside $$ symbols
-        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
-            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-        2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
-    """
 
 
 # ============================================================================

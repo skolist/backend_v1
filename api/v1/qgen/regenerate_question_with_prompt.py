@@ -21,6 +21,7 @@ from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
 from .models import AllQuestions
+from .prompts import regenerate_question_with_prompt_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -66,54 +67,6 @@ def _log_prefix(retry_idx: int = None) -> str:
     if retry_idx is not None:
         return f"RETRY:{retry_idx} | "
     return ""
-
-
-# ============================================================================
-# PROMPT FUNCTIONS
-# ============================================================================
-
-
-def regenerate_question_with_prompt_prompt(
-    gen_question: dict,
-    custom_prompt: Optional[str] = None,
-) -> str:
-    """
-    Generate prompt to regenerate a question with optional custom instructions.
-
-    Args:
-        gen_question: Dictionary containing question data
-        custom_prompt: Optional custom instructions for regeneration
-
-    Returns:
-        Formatted prompt string
-    """
-    latex_instructions = """
-    Common Latex Errors are:
-        1] Not placing inside $$ symbols
-        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
-            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-        2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
-    """
-
-    # Using f-string to avoid issues with curly braces in LaTeX
-    if custom_prompt and custom_prompt.strip():
-        return f"""
-You are given this question: {gen_question}
-
-The user has provided the following instructions for regenerating this question:
-{custom_prompt}
-
-Please regenerate the question according to these instructions while maintaining the same format and structure. 
-If files are attached, use the content from those files to inform your regeneration.
-Return the regenerated question in the same format as the original.
-{latex_instructions}
-"""
-
-    # Default behavior: regenerate on similar concepts (same as regenerate_question)
-    return f"""
-You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
-{latex_instructions}
-"""
 
 
 # ============================================================================

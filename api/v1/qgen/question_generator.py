@@ -37,6 +37,7 @@ from .models import (
     QUESTION_TYPE_TO_SCHEMA,
     QUESTION_TYPE_TO_ENUM,
 )
+from .prompts import generate_questions_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -123,76 +124,6 @@ class BatchValidationError(Exception):
     """Raised when generated questions fail validation."""
 
     pass
-
-
-# ============================================================================
-# PROMPT FUNCTIONS
-# ============================================================================
-
-
-def generate_questions_prompt(
-    concepts: List[str],
-    concepts_descriptions: Dict[str, str],
-    old_questions_on_concepts: List[AllQuestions],
-    n: int,
-    question_type: str,
-    difficulty: str,
-    instructions: Optional[str] = None,
-) -> str:
-    """
-    Generate prompt for creating questions for a batch of concepts.
-
-    Args:
-        concepts: List of concept names to generate questions for
-        concepts_descriptions: Mapping of concept name to description
-        old_questions_on_concepts: Historical questions for reference
-        n: Number of questions to generate
-        question_type: Type of question (mcq4, short_answer, etc.)
-        difficulty: Difficulty level (easy, medium, hard)
-        instructions: Optional custom instructions from user
-
-    Returns:
-        Formatted prompt string for Gemini
-    """
-    # Build concept information
-    concept_info = []
-    for concept in concepts:
-        desc = concepts_descriptions.get(concept, "No description available")
-        concept_info.append(f"{concept}: {desc}")
-
-    concepts_text = "\n".join(concept_info)
-
-    instructions_block = (
-        f"\nAdditional user instructions (prioritize these over anything concepts selected or difficulty or marks or anything): {instructions}"
-        if instructions
-        else ""
-    )
-
-    # Using f-string to avoid issues with curly braces in LaTeX examples
-    return f"""
-    You have access to these concepts and their descriptions:
-    {concepts_text}
-    
-    Historical questions for reference: {old_questions_on_concepts}
-    
-    Generate {n} questions of type {question_type} with difficulty level: {difficulty}
-    
-    Instructions:
-    - Choose concepts from the provided list above that are most relevant for each question
-    - The questions should align with the specified difficulty level: {difficulty}
-    - Use patterns from historical questions as reference but create original questions
-    - Be strictly within the knowledge of the provided concepts, no external knowledge
-    - Strictly use LaTeX format for mathematical entities like symbols and formulas
-    - Strictly output all required fields for the question schema. Answer Text is mandatory, use LaTeX where needed
-    - Question should  be Strictly Accurate and High Quality
-
-    Common Latex Errors are:
-        1] Not placing inside $$ symbols
-        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
-            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-        2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
-    {instructions_block}
-    """
 
 
 # ============================================================================

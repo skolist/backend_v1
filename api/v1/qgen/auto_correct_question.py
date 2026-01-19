@@ -23,6 +23,7 @@ from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
 from .models import AllQuestions
+from .prompts import auto_correct_questions_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -72,36 +73,6 @@ def _log_prefix(retry_idx: int = None) -> str:
     if retry_idx is not None:
         return f"RETRY:{retry_idx} | "
     return ""
-
-
-# ============================================================================
-# PROMPT FUNCTIONS
-# ============================================================================
-
-
-def auto_correct_questions_prompt(gen_question: dict) -> str:
-    """
-    Generate prompt to auto correct a question.
-
-    Args:
-        gen_question: Dictionary containing question data
-
-    Returns:
-        Formatted prompt string
-    """
-    # Using f-string instead of .format() to avoid issues with curly braces in LaTeX
-    return f"""
-    You are given this question {gen_question} and it may not be in proper latex format and a organised way. 
-    There may be some grammatical errors in it. Please correct it, don't change anything related to the meaning 
-    of the question itself. Return the corrected question in the same format.
-    If user has requested something, then there must be something like either grammatical or latex error. High probability that it is latex error in maths question, so check the question carefully.
-    If an image is attached, use it to help understand and correct the question content.
-    Common Latex Errors are:
-        1] Not placing inside $$ symbols
-        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
-            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-        2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
-    """
 
 
 # ============================================================================

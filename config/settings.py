@@ -25,6 +25,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
+PING = os.getenv("PING", "FALSE").upper()
 
 logger.info(
     "Configuration loaded",
@@ -65,7 +66,10 @@ if not DEPLOYMENT_ENV or DEPLOYMENT_ENV not in {"PRODUCTION", "STAGE", "LOCAL"}:
     )
     DEPLOYMENT_ENV = "LOCAL"
 
-check_gemini_api_key(GEMINI_API_KEY)
-check_openai_api_key(OPENAI_API_KEY)
-check_supabase_connection(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-check_supabase_service_key(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+if PING == "TRUE":
+    check_gemini_api_key(GEMINI_API_KEY)
+    check_openai_api_key(OPENAI_API_KEY)
+    check_supabase_connection(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    check_supabase_service_key(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+else:
+    logger.info("Ping Skipped")
