@@ -92,7 +92,7 @@ def regenerate_question_with_prompt_prompt(
         1] Not placing inside $$ symbols
         Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
             If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-        2] For fill in the blanks etc. spaces should use \\_\\_ not some text{{__}} wrapper
+        2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$
     """
 
     # Using f-string to avoid issues with curly braces in LaTeX
