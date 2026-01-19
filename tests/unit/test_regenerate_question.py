@@ -2,15 +2,20 @@
 Unit tests for regenerate question logic.
 
 These tests use a Gemini client (mock by default, real with --gemini-live)
-to validate the regenerate_question_logic function.
+to validate the new refactored architecture:
+    1. process_question() - Single Gemini call (no retries)
+    2. process_question_and_validate() - Calls process_question + validates response
 """
 
 import pytest
 import google.genai as genai
 
 from api.v1.qgen.regenerate_question import (
-    regenerate_question_logic,
     regenerate_question_prompt,
+    process_question,
+    process_question_and_validate,
+    QuestionProcessingError,
+    QuestionValidationError,
 )
 from api.v1.qgen.models import MCQ4, ShortAnswer
 
@@ -58,6 +63,23 @@ def mock_short_answer_question() -> dict:
     }
 
 
+@pytest.fixture
+def mock_latex_question() -> dict:
+    """
+    Mock a question with LaTeX that contains curly braces (potential format issue).
+    """
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440003",
+        "question_text": r"If $\sin^2\theta = \frac{1}{3}$, what is the value of $\cos^2\theta$?",
+        "question_type": "short_answer",
+        "answer_text": r"$\cos^2\theta = \frac{2}{3}$",
+        "explanation": "Using the identity sin²θ + cos²θ = 1",
+        "hardness_level": "medium",
+        "marks": 2,
+        "activity_id": "660e8400-e29b-41d4-a716-446655440001",
+    }
+
+
 # ============================================================================
 # TESTS FOR regenerate_question_prompt
 # ============================================================================
@@ -89,14 +111,101 @@ class TestRegenerateQuestionPrompt:
         prompt = regenerate_question_prompt(mock_short_answer_question)
         assert "same concepts" in prompt.lower() or "new question" in prompt.lower()
 
+    def test_handles_latex_with_curly_braces(self, mock_latex_question: dict):
+        """
+        Test that prompt handles LaTeX with curly braces (no format error).
+        
+        This tests the fix for: "Replacement index 1 out of range for positional args tuple"
+        """
+        # This should NOT raise an error
+        prompt = regenerate_question_prompt(mock_latex_question)
+        assert isinstance(prompt, str)
+        # The LaTeX should be included in the prompt
+        assert "frac" in prompt or "sin" in prompt
+
+    def test_includes_latex_error_instructions(self, mock_mcq4_question: dict):
+        """
+        Test that prompt includes LaTeX error instructions.
+        """
+        prompt = regenerate_question_prompt(mock_mcq4_question)
+        assert "Common Latex Errors" in prompt
+        assert "$" in prompt  # Should mention $$ symbols
+
 
 # ============================================================================
-# TESTS FOR regenerate_question_logic
+# TESTS FOR process_question
 # ============================================================================
 
 
-class TestRegenerateQuestionLogic:
-    """Tests for the regenerate_question_logic function."""
+class TestProcessQuestion:
+    """Tests for the process_question function."""
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_returns_response(
+        self,
+        gemini_client: genai.Client,
+        mock_mcq4_question: dict,
+    ):
+        """
+        Test that process_question returns a Gemini response.
+        """
+        result = await process_question(
+            gemini_client=gemini_client,
+            gen_question_data=mock_mcq4_question,
+            retry_idx=1,
+        )
+
+        # Should return a response object
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_works_with_short_answer(
+        self,
+        gemini_client: genai.Client,
+        mock_short_answer_question: dict,
+    ):
+        """
+        Test that process_question works with short answer questions.
+        """
+        result = await process_question(
+            gemini_client=gemini_client,
+            gen_question_data=mock_short_answer_question,
+            retry_idx=1,
+        )
+
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_works_with_latex_question(
+        self,
+        gemini_client: genai.Client,
+        mock_latex_question: dict,
+    ):
+        """
+        Test that process_question handles LaTeX questions correctly.
+        """
+        result = await process_question(
+            gemini_client=gemini_client,
+            gen_question_data=mock_latex_question,
+            retry_idx=1,
+        )
+
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+
+# ============================================================================
+# TESTS FOR process_question_and_validate
+# ============================================================================
+
+
+class TestProcessQuestionAndValidate:
+    """Tests for the process_question_and_validate function."""
 
     @pytest.mark.slow
     @pytest.mark.asyncio
@@ -106,40 +215,18 @@ class TestRegenerateQuestionLogic:
         mock_mcq4_question: dict,
     ):
         """
-        Test that regenerate_question_logic returns a regenerated question.
+        Test that process_question_and_validate returns a regenerated question.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # Should return a question object (one of the AllQuestions union types)
         assert result is not None
         assert hasattr(result, "question_text")
         assert isinstance(result.question_text, str)
-
-    @pytest.mark.slow
-    @pytest.mark.asyncio
-    async def test_regenerated_question_is_different(
-        self,
-        gemini_client: genai.Client,
-        mock_mcq4_question: dict,
-    ):
-        """
-        Test that the regenerated question is different from the original.
-        """
-        original_text = mock_mcq4_question["question_text"]
-        result = await regenerate_question_logic(
-            gemini_client=gemini_client,
-            gen_question_data=mock_mcq4_question,
-        )
-
-        # The regenerated question should have a different question text
-        # (though still about the same concept)
-        assert result.question_text is not None
-        assert len(result.question_text) > 0
-        # Note: It's possible the AI generates a similar question,
-        # so we just verify it's a valid question
 
     @pytest.mark.slow
     @pytest.mark.asyncio
@@ -151,9 +238,10 @@ class TestRegenerateQuestionLogic:
         """
         Test that regenerated MCQ4 questions have valid options.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # For MCQ4, should have options if it's an MCQ4 type
@@ -178,9 +266,10 @@ class TestRegenerateQuestionLogic:
         """
         Test that short answer questions are regenerated properly.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
+            retry_idx=1,
         )
 
         # For short answer, should have regenerated answer_text
@@ -198,9 +287,10 @@ class TestRegenerateQuestionLogic:
         """
         Test that the regenerated question is about the same concept.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # The regenerated question should still be about kinetic energy
@@ -221,9 +311,10 @@ class TestRegenerateQuestionLogic:
         """
         Test that the result is a valid Pydantic model.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # Should have model_dump method (Pydantic v2)
@@ -241,12 +332,34 @@ class TestRegenerateQuestionLogic:
         """
         Test that the regenerated question includes an explanation.
         """
-        result = await regenerate_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # Should have explanation
         if hasattr(result, "explanation"):
             assert result.explanation is not None
             assert len(result.explanation) > 0
+
+
+# ============================================================================
+# TESTS FOR CUSTOM EXCEPTIONS
+# ============================================================================
+
+
+class TestCustomExceptions:
+    """Tests for custom exception classes."""
+
+    def test_question_processing_error_is_exception(self):
+        """Test that QuestionProcessingError is an Exception."""
+        error = QuestionProcessingError("Test error message")
+        assert isinstance(error, Exception)
+        assert str(error) == "Test error message"
+
+    def test_question_validation_error_is_exception(self):
+        """Test that QuestionValidationError is an Exception."""
+        error = QuestionValidationError("Validation failed")
+        assert isinstance(error, Exception)
+        assert str(error) == "Validation failed"

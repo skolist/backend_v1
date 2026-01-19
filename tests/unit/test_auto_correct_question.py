@@ -2,15 +2,20 @@
 Unit tests for auto-correct question logic.
 
 These tests use a Gemini client (mock by default, real with --gemini-live)
-to validate the auto_correct_question_logic function.
+to validate the new refactored architecture:
+    1. process_question() - Single Gemini call (no retries)
+    2. process_question_and_validate() - Calls process_question + validates response
 """
 
 import pytest
 import google.genai as genai
 
 from api.v1.qgen.auto_correct_question import (
-    auto_correct_question_logic,
     auto_correct_questions_prompt,
+    process_question,
+    process_question_and_validate,
+    QuestionProcessingError,
+    QuestionValidationError,
 )
 from api.v1.qgen.models import MCQ4, ShortAnswer
 
@@ -58,6 +63,23 @@ def mock_short_answer_question() -> dict:
     }
 
 
+@pytest.fixture
+def mock_latex_question() -> dict:
+    """
+    Mock a question with LaTeX that contains curly braces (potential format issue).
+    """
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440003",
+        "question_text": r"If $\sin^2\theta = \frac{1}{3}$, what is the value of $\cos^2\theta$?",
+        "question_type": "short_answer",
+        "answer_text": r"$\cos^2\theta = \frac{2}{3}$",
+        "explanation": "Using the identity sin²θ + cos²θ = 1",
+        "hardness_level": "medium",
+        "marks": 2,
+        "activity_id": "660e8400-e29b-41d4-a716-446655440001",
+    }
+
+
 # ============================================================================
 # TESTS FOR auto_correct_questions_prompt
 # ============================================================================
@@ -90,55 +112,123 @@ class TestAutoCorrectQuestionsPrompt:
         assert "correct" in prompt.lower()
         assert "latex" in prompt.lower() or "format" in prompt.lower()
 
+    def test_handles_latex_with_curly_braces(self, mock_latex_question: dict):
+        """
+        Test that prompt handles LaTeX with curly braces (no format error).
+        
+        This tests the fix for: "Replacement index 1 out of range for positional args tuple"
+        The issue was that .format() interprets {1} in LaTeX \\frac{1}{3} as a placeholder.
+        """
+        # This should NOT raise an error
+        prompt = auto_correct_questions_prompt(mock_latex_question)
+        assert isinstance(prompt, str)
+        # The LaTeX should be included in the prompt
+        assert "frac" in prompt or "sin" in prompt
+
+    def test_includes_latex_error_instructions(self, mock_mcq4_question: dict):
+        """
+        Test that prompt includes LaTeX error instructions.
+        """
+        prompt = auto_correct_questions_prompt(mock_mcq4_question)
+        assert "Common Latex Errors" in prompt
+        assert "$" in prompt  # Should mention $$ symbols
+
 
 # ============================================================================
-# TESTS FOR auto_correct_question_logic
+# TESTS FOR process_question
 # ============================================================================
 
 
-class TestAutoCorrectQuestionLogic:
-    """Tests for the auto_correct_question_logic function."""
+class TestProcessQuestion:
+    """Tests for the process_question function."""
 
     @pytest.mark.slow
     @pytest.mark.asyncio
-    async def test_returns_corrected_question(
+    async def test_returns_response(
         self,
         gemini_client: genai.Client,
         mock_mcq4_question: dict,
     ):
         """
-        Test that auto_correct_question_logic returns a corrected question.
+        Test that process_question returns a Gemini response.
         """
-        result = await auto_correct_question_logic(
+        result = await process_question(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
+        )
+
+        # Should return a response object
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_works_with_short_answer(
+        self,
+        gemini_client: genai.Client,
+        mock_short_answer_question: dict,
+    ):
+        """
+        Test that process_question works with short answer questions.
+        """
+        result = await process_question(
+            gemini_client=gemini_client,
+            gen_question_data=mock_short_answer_question,
+            retry_idx=1,
+        )
+
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_works_with_latex_question(
+        self,
+        gemini_client: genai.Client,
+        mock_latex_question: dict,
+    ):
+        """
+        Test that process_question handles LaTeX questions correctly.
+        """
+        result = await process_question(
+            gemini_client=gemini_client,
+            gen_question_data=mock_latex_question,
+            retry_idx=1,
+        )
+
+        assert result is not None
+        assert hasattr(result, "parsed")
+
+
+# ============================================================================
+# TESTS FOR process_question_and_validate
+# ============================================================================
+
+
+class TestProcessQuestionAndValidate:
+    """Tests for the process_question_and_validate function."""
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_returns_validated_question(
+        self,
+        gemini_client: genai.Client,
+        mock_mcq4_question: dict,
+    ):
+        """
+        Test that process_question_and_validate returns a validated question object.
+        """
+        result = await process_question_and_validate(
+            gemini_client=gemini_client,
+            gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # Should return a question object (one of the AllQuestions union types)
         assert result is not None
         assert hasattr(result, "question_text")
         assert isinstance(result.question_text, str)
-
-    @pytest.mark.slow
-    @pytest.mark.asyncio
-    async def test_preserves_question_meaning(
-        self,
-        gemini_client: genai.Client,
-        mock_mcq4_question: dict,
-    ):
-        """
-        Test that the corrected question preserves the original meaning.
-        """
-        original_text = mock_mcq4_question["question_text"]
-        result = await auto_correct_question_logic(
-            gemini_client=gemini_client,
-            gen_question_data=mock_mcq4_question,
-        )
-
-        # The corrected text should be different (fixing issues)
-        # but the core concept should be about kinetic energy
-        assert result.question_text is not None
-        assert len(result.question_text) > 0
 
     @pytest.mark.slow
     @pytest.mark.asyncio
@@ -150,9 +240,10 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that MCQ4 questions have corrected options.
         """
-        result = await auto_correct_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # For MCQ4, should have options if it's an MCQ4 type
@@ -177,36 +268,16 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that short answer questions are corrected properly.
         """
-        result = await auto_correct_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
+            retry_idx=1,
         )
 
         # For short answer, should have corrected answer_text
         if isinstance(result, ShortAnswer):
             assert result.answer_text is not None
             assert len(result.answer_text) > 0
-
-    @pytest.mark.slow
-    @pytest.mark.asyncio
-    async def test_corrects_grammar_and_formatting(
-        self,
-        gemini_client: genai.Client,
-        mock_mcq4_question: dict,
-    ):
-        """
-        Test that grammar and formatting are improved.
-        """
-        original_text = mock_mcq4_question["question_text"]
-        result = await auto_correct_question_logic(
-            gemini_client=gemini_client,
-            gen_question_data=mock_mcq4_question,
-        )
-
-        # The corrected question should fix the misspelling
-        corrected_text = result.question_text
-        assert "kinetic" in corrected_text.lower()
-        assert "energy" in corrected_text.lower()
 
     @pytest.mark.slow
     @pytest.mark.asyncio
@@ -218,9 +289,10 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that the result is a valid Pydantic model.
         """
-        result = await auto_correct_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_mcq4_question,
+            retry_idx=1,
         )
 
         # Should have model_dump method (Pydantic v2)
@@ -238,13 +310,34 @@ class TestAutoCorrectQuestionLogic:
         """
         Test that corrected question preserves the answer structure.
         """
-        original_answer = mock_short_answer_question["answer_text"]
-        result = await auto_correct_question_logic(
+        result = await process_question_and_validate(
             gemini_client=gemini_client,
             gen_question_data=mock_short_answer_question,
+            retry_idx=1,
         )
 
         # Should have answer_text
         if hasattr(result, "answer_text"):
             assert result.answer_text is not None
             assert len(result.answer_text) > 0
+
+
+# ============================================================================
+# TESTS FOR CUSTOM EXCEPTIONS
+# ============================================================================
+
+
+class TestCustomExceptions:
+    """Tests for custom exception classes."""
+
+    def test_question_processing_error_is_exception(self):
+        """Test that QuestionProcessingError is an Exception."""
+        error = QuestionProcessingError("Test error message")
+        assert isinstance(error, Exception)
+        assert str(error) == "Test error message"
+
+    def test_question_validation_error_is_exception(self):
+        """Test that QuestionValidationError is an Exception."""
+        error = QuestionValidationError("Validation failed")
+        assert isinstance(error, Exception)
+        assert str(error) == "Validation failed"

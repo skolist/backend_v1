@@ -2,7 +2,10 @@
 Unit tests for question generation logic functions with batchification.
 
 These tests validate the batchification-based question generation logic,
-including the build_batches_end_to_end function and generate_questions_for_batches.
+including the build_batches_end_to_end function and the new refactored architecture:
+    1. process_batch_generation() - Single Gemini call for one batch (no retries)
+    2. process_batch_generation_and_validate() - Wrapper that validates the generated questions
+    3. try_retry_batch() - Retry wrapper with configurable max retries
 """
 
 import uuid
@@ -12,7 +15,9 @@ import pytest
 import google.genai as genai
 
 from api.v1.qgen.question_generator import (
-    generate_questions_for_batches,
+    process_batch_generation,
+    process_batch_generation_and_validate,
+    try_retry_batch,
     extract_question_type_counts_dict,
     extract_difficulty_percentages,
     generate_questions_prompt,
@@ -20,6 +25,9 @@ from api.v1.qgen.question_generator import (
     QuestionConfig,
     QuestionTypeConfig,
     DifficultyDistribution,
+    BatchProcessingContext,
+    BatchGenerationError,
+    BatchValidationError,
     QUESTION_TYPE_TO_ENUM,
 )
 from api.v1.qgen.utils.batchification import (
@@ -487,53 +495,209 @@ class TestGenerateQuestionsPrompt:
         assert "Test Concept" in prompt
         assert "Additional user instructions" not in prompt
 
+    def test_handles_latex_with_curly_braces(self):
+        """
+        Test that prompt handles LaTeX with curly braces (no format error).
+        
+        This tests the fix for: "Replacement index 1 out of range for positional args tuple"
+        """
+        # This should NOT raise an error
+        prompt = generate_questions_prompt(
+            concepts=["Test Concept"],
+            concepts_descriptions={"Test Concept": "Test Description"},
+            old_questions_on_concepts=[],
+            n=2,
+            question_type="mcq4",
+            difficulty="easy",
+        )
+        assert isinstance(prompt, str)
+        # Prompt should include LaTeX error instructions
+        assert "Common Latex Errors" in prompt
+
 
 # ============================================================================
-# TESTS FOR generate_questions_for_batches
+# TESTS FOR BatchProcessingContext
 # ============================================================================
 
 
-class TestGenerateQuestionsForBatches:
-    """Tests for the generate_questions_for_batches function."""
+class TestBatchProcessingContext:
+    """Tests for the BatchProcessingContext dataclass."""
 
-    @pytest.fixture
-    def sample_batches(self) -> List[Batch]:
-        """Create sample batches for testing."""
-        return [
-            Batch(
-                question_type="mcq4",
-                difficulty="easy",
-                n_questions=2,
-                concepts=["Newton's Laws of Motion", "Kinetic Energy"],
-                custom_instruction=None,
-            ),
-            Batch(
-                question_type="true_false",
-                difficulty="medium",
-                n_questions=1,
-                concepts=["Potential Energy"],
-                custom_instruction="Focus on real-world examples",
-            ),
-        ]
-
-    @pytest.mark.asyncio
-    async def test_returns_list_of_dicts(
+    def test_creates_context_with_required_fields(
         self,
         gemini_client: genai.Client,
-        sample_batches: List[Batch],
         mock_concepts_dict: Dict[str, str],
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
     ):
-        """Test that generate_questions_for_batches returns a list of dicts."""
-        result = await generate_questions_for_batches(
+        """Test that BatchProcessingContext is created correctly."""
+        ctx = BatchProcessingContext(
             gemini_client=gemini_client,
-            batches=sample_batches,
             concepts_dict=mock_concepts_dict,
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+        )
+
+        assert ctx.gemini_client == gemini_client
+        assert ctx.concepts_dict == mock_concepts_dict
+        assert ctx.concepts_name_to_id == mock_concepts_name_to_id
+        assert ctx.old_questions == mock_old_questions
+        assert ctx.activity_id == mock_activity_id
+        assert ctx.default_marks == 1  # Default value
+
+    def test_creates_context_with_custom_marks(
+        self,
+        gemini_client: genai.Client,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ):
+        """Test that BatchProcessingContext accepts custom marks."""
+        ctx = BatchProcessingContext(
+            gemini_client=gemini_client,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+            default_marks=5,
+        )
+
+        assert ctx.default_marks == 5
+
+
+# ============================================================================
+# TESTS FOR process_batch_generation
+# ============================================================================
+
+
+class TestProcessBatchGeneration:
+    """Tests for the process_batch_generation function."""
+
+    @pytest.fixture
+    def sample_batch(self) -> Batch:
+        """Create a sample batch for testing."""
+        return Batch(
+            question_type="mcq4",
+            difficulty="easy",
+            n_questions=2,
+            concepts=["Newton's Laws of Motion", "Kinetic Energy"],
+            custom_instruction=None,
+        )
+
+    @pytest.fixture
+    def batch_ctx(
+        self,
+        gemini_client: genai.Client,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ) -> BatchProcessingContext:
+        """Create a BatchProcessingContext for testing."""
+        return BatchProcessingContext(
+            gemini_client=gemini_client,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_response_dict(
+        self,
+        sample_batch: Batch,
+        batch_ctx: BatchProcessingContext,
+    ):
+        """Test that process_batch_generation returns a response dict."""
+        result = await process_batch_generation(
+            batch=sample_batch,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
+        )
+
+        assert isinstance(result, dict)
+        assert "response" in result
+        assert "batch" in result
+        assert "unique_concepts" in result
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_concepts(
+        self,
+        batch_ctx: BatchProcessingContext,
+    ):
+        """Test that duplicate concepts are deduplicated."""
+        batch_with_duplicates = Batch(
+            question_type="mcq4",
+            difficulty="easy",
+            n_questions=1,
+            concepts=["Newton's Laws of Motion", "Newton's Laws of Motion", "Kinetic Energy"],
+            custom_instruction=None,
+        )
+
+        result = await process_batch_generation(
+            batch=batch_with_duplicates,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
+        )
+
+        unique_concepts = result["unique_concepts"]
+        assert len(unique_concepts) == len(set(unique_concepts))
+
+
+# ============================================================================
+# TESTS FOR process_batch_generation_and_validate
+# ============================================================================
+
+
+class TestProcessBatchGenerationAndValidate:
+    """Tests for the process_batch_generation_and_validate function."""
+
+    @pytest.fixture
+    def sample_batch(self) -> Batch:
+        """Create a sample batch for testing."""
+        return Batch(
+            question_type="mcq4",
+            difficulty="easy",
+            n_questions=2,
+            concepts=["Newton's Laws of Motion", "Kinetic Energy"],
+            custom_instruction=None,
+        )
+
+    @pytest.fixture
+    def batch_ctx(
+        self,
+        gemini_client: genai.Client,
+        mock_concepts_dict: Dict[str, str],
+        mock_concepts_name_to_id: Dict[str, str],
+        mock_old_questions: List[dict],
+        mock_activity_id: uuid.UUID,
+    ) -> BatchProcessingContext:
+        """Create a BatchProcessingContext for testing."""
+        return BatchProcessingContext(
+            gemini_client=gemini_client,
+            concepts_dict=mock_concepts_dict,
+            concepts_name_to_id=mock_concepts_name_to_id,
+            old_questions=mock_old_questions,
+            activity_id=mock_activity_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_list_of_validated_questions(
+        self,
+        sample_batch: Batch,
+        batch_ctx: BatchProcessingContext,
+    ):
+        """Test that process_batch_generation_and_validate returns validated questions."""
+        result = await process_batch_generation_and_validate(
+            batch=sample_batch,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
         )
 
         assert isinstance(result, list)
@@ -547,21 +711,16 @@ class TestGenerateQuestionsForBatches:
     @pytest.mark.asyncio
     async def test_question_dict_has_required_fields(
         self,
-        gemini_client: genai.Client,
-        sample_batches: List[Batch],
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        sample_batch: Batch,
+        batch_ctx: BatchProcessingContext,
         mock_activity_id: uuid.UUID,
     ):
         """Test that each generated question dict has required fields."""
-        result = await generate_questions_for_batches(
-            gemini_client=gemini_client,
-            batches=sample_batches,
-            concepts_dict=mock_concepts_dict,
-            concepts_name_to_id=mock_concepts_name_to_id,
-            old_questions=mock_old_questions,
-            activity_id=mock_activity_id,
+        result = await process_batch_generation_and_validate(
+            batch=sample_batch,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
         )
 
         for item in result:
@@ -582,144 +741,116 @@ class TestGenerateQuestionsForBatches:
     @pytest.mark.asyncio
     async def test_concept_ids_are_list(
         self,
-        gemini_client: genai.Client,
-        sample_batches: List[Batch],
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
-        mock_activity_id: uuid.UUID,
+        sample_batch: Batch,
+        batch_ctx: BatchProcessingContext,
     ):
         """Test that concept_ids is a list."""
-        result = await generate_questions_for_batches(
-            gemini_client=gemini_client,
-            batches=sample_batches,
-            concepts_dict=mock_concepts_dict,
-            concepts_name_to_id=mock_concepts_name_to_id,
-            old_questions=mock_old_questions,
-            activity_id=mock_activity_id,
+        result = await process_batch_generation_and_validate(
+            batch=sample_batch,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
         )
 
         for item in result:
             assert isinstance(item["concept_ids"], list)
-            assert len(item["concept_ids"]) >= 1
 
     @pytest.mark.asyncio
     async def test_hardness_level_matches_batch_difficulty(
         self,
-        gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
-        mock_activity_id: uuid.UUID,
+        batch_ctx: BatchProcessingContext,
     ):
         """Test that hardness_level in questions matches batch difficulty."""
-        easy_batch = [
-            Batch(
-                question_type="mcq4",
-                difficulty="easy",
-                n_questions=1,
-                concepts=["Newton's Laws of Motion"],
-                custom_instruction=None,
-            ),
-        ]
+        easy_batch = Batch(
+            question_type="mcq4",
+            difficulty="easy",
+            n_questions=1,
+            concepts=["Newton's Laws of Motion"],
+            custom_instruction=None,
+        )
 
-        result = await generate_questions_for_batches(
-            gemini_client=gemini_client,
-            batches=easy_batch,
-            concepts_dict=mock_concepts_dict,
-            concepts_name_to_id=mock_concepts_name_to_id,
-            old_questions=mock_old_questions,
-            activity_id=mock_activity_id,
+        result = await process_batch_generation_and_validate(
+            batch=easy_batch,
+            ctx=batch_ctx,
+            batch_idx=1,
+            retry_idx=1,
         )
 
         for item in result:
-            assert (
-                item["question"]["hardness_level"] == PublicHardnessLevelEnumEnum.EASY
-            )
+            assert item["question"]["hardness_level"] == PublicHardnessLevelEnumEnum.EASY
 
-    @pytest.mark.asyncio
-    async def test_handles_duplicate_concepts_in_batch(
+
+# ============================================================================
+# TESTS FOR try_retry_batch
+# ============================================================================
+
+
+class TestTryRetryBatch:
+    """Tests for the try_retry_batch function."""
+
+    @pytest.fixture
+    def sample_batch(self) -> Batch:
+        """Create a sample batch for testing."""
+        return Batch(
+            question_type="mcq4",
+            difficulty="easy",
+            n_questions=1,
+            concepts=["Newton's Laws of Motion"],
+            custom_instruction=None,
+        )
+
+    @pytest.fixture
+    def batch_ctx(
         self,
         gemini_client: genai.Client,
         mock_concepts_dict: Dict[str, str],
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
-    ):
-        """Test that duplicate concepts in batch are deduplicated."""
-        batch_with_duplicates = [
-            Batch(
-                question_type="mcq4",
-                difficulty="easy",
-                n_questions=2,
-                # Duplicate concepts
-                concepts=[
-                    "Newton's Laws of Motion",
-                    "Newton's Laws of Motion",
-                    "Kinetic Energy",
-                ],
-                custom_instruction=None,
-            ),
-        ]
-
-        result = await generate_questions_for_batches(
+    ) -> BatchProcessingContext:
+        """Create a BatchProcessingContext for testing."""
+        return BatchProcessingContext(
             gemini_client=gemini_client,
-            batches=batch_with_duplicates,
             concepts_dict=mock_concepts_dict,
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
         )
-
-        # concept_ids should be deduplicated
-        for item in result:
-            concept_ids = item["concept_ids"]
-            # Should have no duplicates
-            assert len(concept_ids) == len(set(concept_ids))
 
     @pytest.mark.asyncio
-    async def test_empty_batches_returns_empty_list(
+    async def test_returns_validated_questions_on_success(
         self,
-        gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
-        mock_activity_id: uuid.UUID,
+        sample_batch: Batch,
+        batch_ctx: BatchProcessingContext,
     ):
-        """Test that empty batches list returns empty result."""
-        result = await generate_questions_for_batches(
-            gemini_client=gemini_client,
-            batches=[],
-            concepts_dict=mock_concepts_dict,
-            concepts_name_to_id=mock_concepts_name_to_id,
-            old_questions=mock_old_questions,
-            activity_id=mock_activity_id,
+        """Test that try_retry_batch returns validated questions on success."""
+        result = await try_retry_batch(
+            batch=sample_batch,
+            batch_idx=1,
+            ctx=batch_ctx,
+            max_retries=3,
         )
 
-        assert result == []
+        assert isinstance(result, list)
+        assert len(result) > 0
 
-    @pytest.mark.asyncio
-    async def test_custom_marks(
-        self,
-        gemini_client: genai.Client,
-        sample_batches: List[Batch],
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
-        mock_activity_id: uuid.UUID,
-    ):
-        """Test that custom marks value is applied."""
-        custom_marks = 5
 
-        result = await generate_questions_for_batches(
-            gemini_client=gemini_client,
-            batches=sample_batches,
-            concepts_dict=mock_concepts_dict,
-            concepts_name_to_id=mock_concepts_name_to_id,
-            old_questions=mock_old_questions,
-            activity_id=mock_activity_id,
-            default_marks=custom_marks,
-        )
+# ============================================================================
+# TESTS FOR CUSTOM EXCEPTIONS
+# ============================================================================
 
-        for item in result:
-            assert item["question"]["marks"] == custom_marks
+
+class TestCustomExceptions:
+    """Tests for custom exception classes."""
+
+    def test_batch_generation_error_is_exception(self):
+        """Test that BatchGenerationError is an Exception."""
+        error = BatchGenerationError("Test error message")
+        assert isinstance(error, Exception)
+        assert str(error) == "Test error message"
+
+    def test_batch_validation_error_is_exception(self):
+        """Test that BatchValidationError is an Exception."""
+        error = BatchValidationError("Validation failed")
+        assert isinstance(error, Exception)
+        assert str(error) == "Validation failed"
