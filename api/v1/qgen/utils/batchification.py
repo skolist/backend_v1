@@ -1,3 +1,7 @@
+"""
+Contains the logic to batchify question generation requests based on various parameters.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,11 +15,13 @@ import math
 # ----------------------------
 @dataclass(frozen=True)
 class Batch:
+    """Batch definition."""
+
     question_type: str
     difficulty: str
-    n_questions: int                  # <= max_questions_per_batch
-    concepts: List[str]               # at least 1 concept per batch
-    custom_instruction: Any           # str | list | dict | None
+    n_questions: int  # <= max_questions_per_batch
+    concepts: List[str]  # at least 1 concept per batch
+    custom_instruction: Any  # str | list | dict | None
 
 
 # ----------------------------
@@ -63,9 +69,7 @@ def _largest_remainder_apportion(
     rem = total - used
 
     remainders = sorted(
-        keys,
-        key=lambda k: (ideals[k] - floors[k], w_norm[k]),
-        reverse=True
+        keys, key=lambda k: (ideals[k] - floors[k], w_norm[k]), reverse=True
     )
     for k in remainders[:rem]:
         floors[k] += 1
@@ -89,7 +93,7 @@ def _expand_concepts_to_slots(
     slots: int,
     *,
     rng: random.Random,
-    shuffle_each_cycle: bool = True
+    shuffle_each_cycle: bool = True,
 ) -> List[str]:
     """
     If concepts < slots, repeat concepts until length==slots.
@@ -118,8 +122,8 @@ def _apply_custom_instruction_fraction(
     custom_instruction_value: Any,
     fraction: float,
     *,
-    mode: str = "first",   # "first" or "random"
-    seed: Optional[int] = None
+    mode: str = "first",  # "first" or "random"
+    seed: Optional[int] = None,
 ) -> List[Batch]:
     """
     Keep custom_instruction only in fraction of batches; others -> None.
@@ -138,7 +142,13 @@ def _apply_custom_instruction_fraction(
         ]
     if k >= n:
         return [
-            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, custom_instruction_value)
+            Batch(
+                b.question_type,
+                b.difficulty,
+                b.n_questions,
+                b.concepts,
+                custom_instruction_value,
+            )
             for b in batches
         ]
 
@@ -152,13 +162,16 @@ def _apply_custom_instruction_fraction(
     updated: List[Batch] = []
     for i, b in enumerate(batches):
         ci = custom_instruction_value if i in chosen else None
-        updated.append(Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, ci))
+        updated.append(
+            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, ci)
+        )
     return updated
 
 
 # ----------------------------
 # Main API
 # ----------------------------
+# pylint: disable=too-many-branches, too-many-statements
 def build_batches_end_to_end(
     question_type_counts: Dict[str, int],
     concepts: List[str],
@@ -175,14 +188,19 @@ def build_batches_end_to_end(
     End-to-end batch builder.
 
     Core behavior:
-    - If concepts >= total_questions: use concepts uniquely (no overlap across types) and consume ALL concepts.
-    - If concepts < total_questions: repeat concepts ONLY as needed so that we have one concept-slot per question.
+    - If concepts >= total_questions:
+        - use concepts uniquely (no overlap across types)
+        - consume ALL concepts.
+    - If concepts < total_questions:
+        - repeat concepts ONLY as needed so that we have one concept-slot per question.
     - Difficulty buckets with 0% or 0 questions are removed.
     - Every produced batch has at least 1 concept.
     - Each (type,difficulty) bucket is split into granular batches of <=3 questions.
     - Custom instruction appears in only ~30% batches (rounded), rest None.
     """
-    active_types = [(qt, int(cnt)) for qt, cnt in question_type_counts.items() if int(cnt) > 0]
+    active_types = [
+        (qt, int(cnt)) for qt, cnt in question_type_counts.items() if int(cnt) > 0
+    ]
     if not active_types:
         raise ValueError("No question types with count > 0 provided.")
 
@@ -200,20 +218,12 @@ def build_batches_end_to_end(
     diff_norm = _normalize_weights(difficulty_percent)
     diff_keys = list(diff_norm.keys())
 
-    # --- Key logic change ---
-    # If concepts < total_questions, repeat concepts to create one "concept-slot" per question.
-    # If concepts >= total_questions, we keep ALL concepts (even if more than questions) to match your earlier logic.
     if len(base_concepts) < total_questions:
         concept_slots = _expand_concepts_to_slots(
-            base_concepts,
-            slots=total_questions,
-            rng=rng,
-            shuffle_each_cycle=True
+            base_concepts, slots=total_questions, rng=rng, shuffle_each_cycle=True
         )
-        slots_mode = "per_question_slots"
     else:
         concept_slots = base_concepts[:]  # use ALL concepts
-        slots_mode = "use_all_concepts"
 
     total_slots = len(concept_slots)
 
@@ -221,20 +231,12 @@ def build_batches_end_to_end(
     type_keys = [qt for qt, _ in active_types]
     type_weights = {qt: cnt / total_questions for qt, cnt in active_types}
     slots_per_type = _largest_remainder_apportion(total_slots, type_keys, type_weights)
-
-    # Slice slots per type (these "slots" are concept assignments; may repeat across types if repeated in slots list)
     type_slots: Dict[str, List[str]] = {}
     idx = 0
     for qt in type_keys:
         n = slots_per_type[qt]
-        # Guarantee each active type has at least 1 slot by borrowing if needed (rare edge when total_slots < num_types).
-        # But note: total_slots is at least 1 and apportion could give 0 if extremely small.
-        # We'll fix by enforcing min-1 if feasible.
-        type_slots[qt] = concept_slots[idx: idx + n]
+        type_slots[qt] = concept_slots[idx : idx + n]
         idx += n
-
-    # Enforce "concepts can't be zero" for active types:
-    # If any type got 0 slots, we re-balance by taking 1 slot from a type with >1.
     zero_types = [qt for qt in type_keys if len(type_slots[qt]) == 0]
     if zero_types:
         donors = [qt for qt in type_keys if len(type_slots[qt]) > 1]
@@ -257,8 +259,10 @@ def build_batches_end_to_end(
         # Questions per difficulty for this type
         q_per_diff = _largest_remainder_apportion(q_count, diff_keys, diff_norm)
 
-        # Concept-slots for this type are distributed across difficulties proportional to question counts
-        # IMPORTANT: If slots_mode=="use_all_concepts", slots_per_type can exceed q_count; still fine.
+        # Concept-slots for this type are distributed across difficulties,
+        # proportional to question counts
+        # IMPORTANT: If slots_mode=="use_all_concepts",
+        # slots_per_type can exceed q_count; still fine.
         # We distribute all slots of this type across difficulties using the same diff weights.
         slots = type_slots[qt]
         s_count = len(slots)
@@ -274,7 +278,7 @@ def build_batches_end_to_end(
                 s_idx += n_s
                 continue
 
-            diff_slots = slots[s_idx: s_idx + n_s]
+            diff_slots = slots[s_idx : s_idx + n_s]
             s_idx += n_s
 
             # Split questions into chunks <= max_questions_per_batch
@@ -283,22 +287,25 @@ def build_batches_end_to_end(
             # Split diff_slots across chunks proportional to chunk sizes
             chunk_keys = [str(i) for i in range(len(q_chunks))]
             chunk_weights = {str(i): q_chunks[i] / n_q for i in range(len(q_chunks))}
-            s_per_chunk = _largest_remainder_apportion(len(diff_slots), chunk_keys, chunk_weights)
+            s_per_chunk = _largest_remainder_apportion(
+                len(diff_slots), chunk_keys, chunk_weights
+            )
 
             pos = 0
             for i, qn in enumerate(q_chunks):
                 take = s_per_chunk[str(i)]
-                concepts_for_batch = diff_slots[pos: pos + take]
+                concepts_for_batch = diff_slots[pos : pos + take]
                 pos += take
 
                 # Guarantee at least 1 concept in every batch (your constraint).
-                # If allocation gave 0, borrow from remaining if possible; else borrow from previous portion.
+                # If allocation gave 0, borrow from remaining if possible;
+                # else borrow from previous portion.
                 if not concepts_for_batch:
                     if pos < len(diff_slots):
                         concepts_for_batch = [diff_slots[pos]]
                         pos += 1
                     else:
-                        # last resort: reuse one concept from this diff (allowed only when necessary)
+                        # last resort: reuse one concept from this diff
                         concepts_for_batch = [diff_slots[-1]]
 
                 batches.append(

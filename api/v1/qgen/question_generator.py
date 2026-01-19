@@ -21,13 +21,13 @@ from supabase_dir import (
     GenQuestionsInsert,
     GenQuestionsConceptsMapsInsert,
 )
+
+from .utils.batchification import build_batches_end_to_end, Batch
 from .models import (
     AllQuestions,
     QUESTION_TYPE_TO_SCHEMA,
     QUESTION_TYPE_TO_ENUM,
-    QUESTION_TYPE_TO_FIELD,
 )
-from .utils.batchification import build_batches_end_to_end, Batch
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ def generate_questions_prompt(
     for concept in concepts:
         desc = concepts_descriptions.get(concept, "No description available")
         concept_info.append(f"{concept}: {desc}")
-    
+
     concepts_text = "\n".join(concept_info)
 
     prompt = """
@@ -122,7 +122,9 @@ def generate_questions_prompt(
     """
 
     instructions_block = (
-        f"\nAdditional user instructions (prioritize these): {instructions}" if instructions else ""
+        f"\nAdditional user instructions (prioritize these): {instructions}"
+        if instructions
+        else ""
     )
 
     return prompt.format(
@@ -174,7 +176,7 @@ async def generate_questions_for_batches(
 ) -> List[Dict[str, any]]:
     """
     Generate questions based on batches using GenAI.
-    
+
     Uses async parallelization to make concurrent API calls for each batch,
     significantly reducing total execution time for network-bound operations.
 
@@ -190,29 +192,33 @@ async def generate_questions_for_batches(
     Returns:
         List of dicts with 'question' (GenQuestionsInsert-compatible) and 'concept_ids'
     """
-    
+
     async def generate_questions_for_batch(
         batch: Batch,
     ) -> List[Dict[str, any]]:
         """Generate questions for a specific batch."""
         question_schema = QUESTION_TYPE_TO_SCHEMA.get(batch.question_type)
         question_type_enum = QUESTION_TYPE_TO_ENUM.get(batch.question_type)
-        
+
         if not question_schema or not question_type_enum:
             logger.warning(f"Unknown question type: {batch.question_type}")
             return []
-        
+
         # Deduplicate concepts for this batch
-        unique_concepts = list(dict.fromkeys(batch.concepts))  # Preserves order while removing duplicates
-        
+        unique_concepts = list(
+            dict.fromkeys(batch.concepts)
+        )  # Preserves order while removing duplicates
+
         # Map difficulty to enum
         difficulty_mapping = {
             "easy": PublicHardnessLevelEnumEnum.EASY,
-            "medium": PublicHardnessLevelEnumEnum.MEDIUM, 
+            "medium": PublicHardnessLevelEnumEnum.MEDIUM,
             "hard": PublicHardnessLevelEnumEnum.HARD,
         }
-        hardness_level = difficulty_mapping.get(batch.difficulty, PublicHardnessLevelEnumEnum.MEDIUM)
-        
+        hardness_level = difficulty_mapping.get(
+            batch.difficulty, PublicHardnessLevelEnumEnum.MEDIUM
+        )
+
         try:
             # Use async API call for parallel execution
             questions_response = await gemini_client.aio.models.generate_content(
@@ -231,7 +237,7 @@ async def generate_questions_for_batches(
                     "response_schema": question_schema,
                 },
             )
-            
+
             results = []
             for q in questions_response.parsed.questions:
                 gen_question_dict = {
@@ -242,23 +248,33 @@ async def generate_questions_for_batches(
                     "marks": default_marks,
                 }
                 # Collect unique concept IDs for this batch
-                concept_ids = list(dict.fromkeys([  # Remove duplicates while preserving order
-                    concepts_name_to_id.get(concept) for concept in unique_concepts 
-                    if concepts_name_to_id.get(concept)
-                ]))
-                results.append({
-                    "question": gen_question_dict,
-                    "concept_ids": concept_ids,
-                })
+                concept_ids = list(
+                    dict.fromkeys(
+                        [  # Remove duplicates while preserving order
+                            concepts_name_to_id.get(concept)
+                            for concept in unique_concepts
+                            if concepts_name_to_id.get(concept)
+                        ]
+                    )
+                )
+                results.append(
+                    {
+                        "question": gen_question_dict,
+                        "concept_ids": concept_ids,
+                    }
+                )
             return results
         except Exception as e:
-            logger.error(f"Error parsing questions response for batch {batch}: {e}", exc_info=True)
+            logger.error(
+                f"Error parsing questions response for batch {batch}: {e}",
+                exc_info=True,
+            )
             return []
 
     # Execute all batch API calls in parallel
     tasks = [generate_questions_for_batch(batch) for batch in batches]
     results = await asyncio.gather(*tasks)
-    
+
     # Flatten results
     gen_questions_data: List[Dict[str, any]] = []
     for result in results:
@@ -337,9 +353,11 @@ async def generate_questions(
 
         # Extract parameters for batchification
         question_type_counts = extract_question_type_counts_dict(request)
-        difficulty_percentages = extract_difficulty_percentages(request.config.difficulty_distribution)
+        difficulty_percentages = extract_difficulty_percentages(
+            request.config.difficulty_distribution
+        )
         concept_names = [concept["name"] for concept in concepts]
-        
+
         # Create batches using batchification logic
         batches = build_batches_end_to_end(
             question_type_counts=question_type_counts,
@@ -398,8 +416,15 @@ async def generate_questions(
                         ).execute()
                     except Exception as mapping_error:
                         # Handle duplicate key constraint violations (ignore duplicates)
-                        if "duplicate key value violates unique constraint" in str(mapping_error):
-                            logger.info(f"Concept-question mapping already exists for question_id={question_id}, concept_id={concept_id}. Skipping.")
+                        if "duplicate key value violates unique constraint" in str(
+                            mapping_error
+                        ):
+                            logger.info(
+                                f"""
+                        Concept-question mapping already exists for question_id={question_id},
+                        concept_id={concept_id}. Skipping.
+                                """
+                            )
                         else:
                             # Re-raise if it's a different error
                             raise mapping_error

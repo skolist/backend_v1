@@ -7,18 +7,13 @@ The --gemini-live option is defined in tests/conftest.py.
 
 import os
 from typing import Any, Optional
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 from dotenv import load_dotenv
 import google.genai as genai
 
 from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
-from api.v1.qgen.question_generator import (
-    ConceptQuestionTypeDistribution,
-    ConceptDistributionItem,
-    QuestionTypeDistribution,
-)
 
 
 # ============================================================================
@@ -60,31 +55,11 @@ def create_mock_true_false(question_text: Optional[str] = None) -> TrueFalse:
 def create_mock_fill_in_blank(question_text: Optional[str] = None) -> FillInTheBlank:
     """Create a mock FillInTheBlank question."""
     return FillInTheBlank(
-        question_text=question_text or "The formula for kinetic energy is KE = 1/2 * m * ___",
+        question_text=question_text
+        or "The formula for kinetic energy is KE = 1/2 * m * ___",
         answer_text="v^2",
         explanation="Velocity squared completes the kinetic energy formula.",
     )
-
-
-def create_mock_distribution(concept_names: list[str]) -> ConceptQuestionTypeDistribution:
-    """Create a mock distribution for the given concepts."""
-    distribution = []
-    for i, name in enumerate(concept_names):
-        # Distribute questions somewhat evenly
-        distribution.append(
-            ConceptDistributionItem(
-                concept_name=name,
-                question_counts=QuestionTypeDistribution(
-                    mcq4=1 if i == 0 else 1,
-                    msq4=0,
-                    fill_in_the_blank=1 if i == 0 else 0,
-                    true_false=1 if i == 0 else 0,
-                    short_answer=0,
-                    long_answer=0,
-                ),
-            )
-        )
-    return ConceptQuestionTypeDistribution(distribution=distribution)
 
 
 # ============================================================================
@@ -126,53 +101,64 @@ class MockGeminiModels:
         schema = config.get("response_schema")
         schema_name = getattr(schema, "__name__", str(schema))
         contents_str = str(contents).lower()
-        
-        # Handle distribution schema
-        if schema == ConceptQuestionTypeDistribution or "distribution" in schema_name.lower():
-            concept_names = ["Newton's Laws of Motion", "Kinetic Energy"]
-            return MockParsedResponse(create_mock_distribution(concept_names))
-        
+
         # Handle auto-correct endpoint (returns wrapper with .question)
         if "AutoCorrected" in schema_name:
             # Check if it's a short answer based on input
             if "short_answer" in contents_str:
+
                 class QuestionWrapper:
-                    question = create_mock_short_answer("What is Newton's first law of motion?")
+                    question = create_mock_short_answer(
+                        "What is Newton's first law of motion?"
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
             else:
+
                 class QuestionWrapper:
-                    question = create_mock_mcq4("What is the formula for kinetic energy?")
+                    question = create_mock_mcq4(
+                        "What is the formula for kinetic energy?"
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
-        
+
         # Handle regenerate endpoints (returns wrapper with .question)
         if "Regenerated" in schema_name:
             # Check if it's a short answer based on input
             if "short_answer" in contents_str:
+
                 class QuestionWrapper:
-                    question = create_mock_short_answer("Describe the principle of conservation of momentum.")
+                    question = create_mock_short_answer(
+                        "Describe the principle of conservation of momentum."
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
             else:
+
                 class QuestionWrapper:
-                    question = create_mock_mcq4("Calculate the kinetic energy of a 5kg object moving at 10 m/s.")
+                    question = create_mock_mcq4(
+                        "Calculate the kinetic energy of a 5kg object moving at 10 m/s."
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
-        
+
         # Handle question generation schemas (returns wrapper with .questions list)
         if "mcq4" in contents_str:
             questions = MockQuestionsResponse([create_mock_mcq4()])
             return MockParsedResponse(questions)
-        
+
         if "true_false" in contents_str:
             questions = MockQuestionsResponse([create_mock_true_false()])
             return MockParsedResponse(questions)
-        
+
         if "fill_in_the_blank" in contents_str:
             questions = MockQuestionsResponse([create_mock_fill_in_blank()])
             return MockParsedResponse(questions)
-        
+
         if "short_answer" in contents_str:
             questions = MockQuestionsResponse([create_mock_short_answer()])
             return MockParsedResponse(questions)
-        
+
         # Default: return MCQ4 questions list
         questions = MockQuestionsResponse([create_mock_mcq4()])
         return MockParsedResponse(questions)
@@ -203,7 +189,7 @@ class MockGeminiClient:
 def gemini_client(use_live_gemini) -> genai.Client:
     """
     Provide Gemini client - mock by default, real with --gemini-live flag.
-    
+
     Usage:
         pytest tests/unit/                    # Uses mock client
         pytest tests/unit/ --gemini-live      # Uses real API

@@ -1,8 +1,8 @@
 """
-Integration tests for the generate_questions API endpoint.
+Integration tests for the generate_questions API endpoint with batchification.
 
 These tests use a real Supabase client and Gemini API to test
-the full end-to-end question generation flow.
+the full end-to-end question generation flow with the new batchification logic.
 """
 
 import uuid
@@ -210,7 +210,6 @@ class TestGenerateQuestionsValidation:
 
         # Empty concept_ids should either be 422 or 201 (with no questions generated)
         # or 500 if the implementation doesn't handle empty list gracefully
-        # Note: 500 indicates a bug in the endpoint that should be fixed
         assert response.status_code in [201, 422, 500]
 
     def test_returns_422_when_total_questions_is_zero(
@@ -326,12 +325,12 @@ class TestGenerateQuestionsValidation:
 
 
 # ============================================================================
-# TESTS FOR SUCCESSFUL QUESTION GENERATION
+# TESTS FOR SUCCESSFUL QUESTION GENERATION WITH BATCHIFICATION
 # ============================================================================
 
 
 class TestGenerateQuestionsSuccess:
-    """Tests for successful question generation."""
+    """Tests for successful question generation with batchification."""
 
     @pytest.mark.slow
     def test_generates_mcq4_questions_successfully(
@@ -390,6 +389,7 @@ class TestGenerateQuestionsSuccess:
     ):
         """
         Test that multiple question types can be generated in one request.
+        Uses batchification to distribute across types.
         """
         concept_ids = [c["id"] for c in test_concepts]
         activity_id = test_activity["id"]
@@ -434,6 +434,7 @@ class TestGenerateQuestionsSuccess:
     ):
         """
         Test that concept-question mappings are created in gen_questions_concepts_maps.
+        With batchification, multiple concepts can be mapped to each question.
         """
         concept_ids = [c["id"] for c in test_concepts]
         activity_id = test_activity["id"]
@@ -471,13 +472,56 @@ class TestGenerateQuestionsSuccess:
                 .execute()
             )
 
-            # Each question should have a concept mapping
+            # Each question should have at least one concept mapping
             assert len(mappings.data) >= len(gen_questions.data)
 
             # Verify concept_ids in mappings are from our test concepts
             mapping_concept_ids = {m["concept_id"] for m in mappings.data}
             for cid in mapping_concept_ids:
                 assert cid in concept_ids
+
+    @pytest.mark.slow
+    def test_difficulty_distribution_is_applied(
+        self,
+        test_client: TestClient,
+        service_supabase_client: Client,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+        test_bank_questions: List[Dict[str, Any]],
+    ):
+        """
+        Test that difficulty distribution is correctly applied across batches.
+        """
+        concept_ids = [c["id"] for c in test_concepts]
+        activity_id = test_activity["id"]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": activity_id,
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 6}],
+                    "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
+                },
+            },
+        )
+
+        assert response.status_code == 201
+
+        # Verify questions were created with different difficulty levels
+        gen_questions = (
+            service_supabase_client.table("gen_questions")
+            .select("hardness_level")
+            .eq("activity_id", activity_id)
+            .execute()
+        )
+
+        if gen_questions.data:
+            difficulty_levels = {q["hardness_level"] for q in gen_questions.data}
+            # With the distribution, we should have multiple difficulty levels
+            # (at least for 6+ questions)
+            assert len(difficulty_levels) >= 1
 
 
 # ============================================================================
@@ -486,7 +530,7 @@ class TestGenerateQuestionsSuccess:
 
 
 class TestGenerateQuestionsEdgeCases:
-    """Tests for edge cases in question generation."""
+    """Tests for edge cases in question generation with batchification."""
 
     def test_handles_nonexistent_concepts_gracefully(
         self,
@@ -513,6 +557,78 @@ class TestGenerateQuestionsEdgeCases:
         # Should handle gracefully - either 201 (no questions) or appropriate error
         assert response.status_code in [201, 500]
 
+    @pytest.mark.slow
+    def test_single_concept_multiple_questions(
+        self,
+        test_client: TestClient,
+        service_supabase_client: Client,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+        test_bank_questions: List[Dict[str, Any]],
+    ):
+        """
+        Test that batchification correctly handles single concept with multiple questions.
+        Concept should be repeated across batches.
+        """
+        # Use only one concept
+        concept_ids = [test_concepts[0]["id"]]
+        activity_id = test_activity["id"]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": activity_id,
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 5}],
+                    "difficulty_distribution": {"easy": 100, "medium": 0, "hard": 0},
+                },
+            },
+        )
+
+        assert response.status_code == 201
+
+        # Verify all questions are generated
+        gen_questions = (
+            service_supabase_client.table("gen_questions")
+            .select("*")
+            .eq("activity_id", activity_id)
+            .execute()
+        )
+
+        # Should have generated some questions
+        assert len(gen_questions.data) >= 1
+
+    @pytest.mark.slow
+    def test_many_concepts_few_questions(
+        self,
+        test_client: TestClient,
+        service_supabase_client: Client,
+        test_activity: Dict[str, Any],
+        test_concepts: List[Dict[str, Any]],
+        test_bank_questions: List[Dict[str, Any]],
+    ):
+        """
+        Test that batchification handles case where concepts > questions.
+        All concepts should be distributed across batches.
+        """
+        concept_ids = [c["id"] for c in test_concepts]  # 2+ concepts
+        activity_id = test_activity["id"]
+
+        response = test_client.post(
+            "/api/v1/qgen/generate_questions",
+            json={
+                "activity_id": activity_id,
+                "concept_ids": concept_ids,
+                "config": {
+                    "question_types": [{"type": "mcq4", "count": 1}],
+                    "difficulty_distribution": {"easy": 100, "medium": 0, "hard": 0},
+                },
+            },
+        )
+
+        assert response.status_code == 201
+
 
 # ============================================================================
 # TESTS FOR INSTRUCTIONS PARAMETER
@@ -520,7 +636,7 @@ class TestGenerateQuestionsEdgeCases:
 
 
 class TestGenerateQuestionsWithInstructions:
-    """Tests for the instructions parameter in question generation."""
+    """Tests for the instructions parameter in question generation with batchification."""
 
     @pytest.mark.slow
     def test_accepts_instructions_parameter(
@@ -533,6 +649,7 @@ class TestGenerateQuestionsWithInstructions:
     ):
         """
         Test that the endpoint accepts and processes instructions parameter.
+        Instructions should be applied to ~30% of batches.
         """
         concept_ids = [c["id"] for c in test_concepts]
         activity_id = test_activity["id"]

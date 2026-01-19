@@ -62,12 +62,12 @@ If files are attached, use the content from those files to inform your regenerat
 Return the regenerated question in the same format as the original.
 """
         return prompt.format(gen_question=gen_question, custom_prompt=custom_prompt)
-    else:
-        # Default behavior: regenerate on similar concepts (same as regenerate_question)
-        prompt = """
+
+    # Default behavior: regenerate on similar concepts (same as regenerate_question)
+    prompt = """
 You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
 """
-        return prompt.format(gen_question=gen_question)
+    return prompt.format(gen_question=gen_question)
 
 
 # ============================================================================

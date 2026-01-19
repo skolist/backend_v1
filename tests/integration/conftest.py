@@ -21,11 +21,6 @@ from supabase import Client, create_client
 from app import create_app
 from supabase_dir import PublicProductTypeEnumEnum
 from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
-from api.v1.qgen.question_generator import (
-    ConceptQuestionTypeDistribution,
-    ConceptDistributionItem,
-    QuestionTypeDistribution,
-)
 
 
 # ============================================================================
@@ -75,63 +70,16 @@ def create_mock_true_false(question_text: str | None = None) -> TrueFalse:
 def create_mock_fill_in_blank(question_text: str | None = None) -> FillInTheBlank:
     """Create a mock FillInTheBlank question."""
     return FillInTheBlank(
-        question_text=question_text or "The formula for kinetic energy is KE = 1/2 * m * ___",
+        question_text=question_text
+        or "The formula for kinetic energy is KE = 1/2 * m * ___",
         answer_text="v^2",
         explanation="Velocity squared completes the kinetic energy formula.",
         hardness_level="medium",
         marks=1,
     )
 
-
-def create_mock_distribution(
-    concept_names: list[str],
-    requested_types: dict[str, int] | None = None,
-) -> ConceptQuestionTypeDistribution:
-    """
-    Create a mock distribution for the given concepts.
-    
-    Args:
-        concept_names: List of concept names
-        requested_types: Dict mapping question type to requested count.
-                        If None, defaults to mcq4 only.
-    """
-    if requested_types is None:
-        # Default to just mcq4
-        requested_types = {"mcq4": 2}
-    
     distribution = []
     total_concepts = len(concept_names)
-    
-    for i, name in enumerate(concept_names):
-        # Distribute questions across concepts
-        counts = QuestionTypeDistribution(
-            mcq4=0,
-            msq4=0,
-            fill_in_the_blank=0,
-            true_false=0,
-            short_answer=0,
-            long_answer=0,
-        )
-        
-        # Distribute each requested type evenly across concepts
-        for qtype, total_count in requested_types.items():
-            if total_count > 0:
-                # Give first concept the majority
-                if i == 0:
-                    count_for_concept = (total_count + total_concepts - 1) // total_concepts
-                else:
-                    count_for_concept = total_count // total_concepts
-                
-                if hasattr(counts, qtype):
-                    setattr(counts, qtype, count_for_concept)
-        
-        distribution.append(
-            ConceptDistributionItem(
-                concept_name=name,
-                question_counts=counts,
-            )
-        )
-    return ConceptQuestionTypeDistribution(distribution=distribution)
 
 
 # ============================================================================
@@ -160,32 +108,6 @@ class MockQuestionsResponse:
 class MockGeminiModels:
     """Mock for gemini_client.aio.models."""
 
-    def _parse_requested_types(self, contents_str: str) -> dict[str, int]:
-        """Parse requested question types from the distribution prompt."""
-        import re
-        
-        requested = {}
-        
-        # Try to parse type counts from distribution prompt
-        # The prompt typically contains something like: 'mcq4': 2, 'true_false': 1
-        type_patterns = [
-            ("mcq4", r"'mcq4'\s*:\s*(\d+)"),
-            ("msq4", r"'msq4'\s*:\s*(\d+)"),
-            ("fill_in_the_blank", r"'fill_in_the_blank'\s*:\s*(\d+)"),
-            ("true_false", r"'true_false'\s*:\s*(\d+)"),
-            ("short_answer", r"'short_answer'\s*:\s*(\d+)"),
-            ("long_answer", r"'long_answer'\s*:\s*(\d+)"),
-        ]
-        
-        for qtype, pattern in type_patterns:
-            match = re.search(pattern, contents_str)
-            if match:
-                count = int(match.group(1))
-                if count > 0:
-                    requested[qtype] = count
-        
-        return requested if requested else {"mcq4": 2}
-
     async def generate_content(
         self,
         model: str,
@@ -197,32 +119,42 @@ class MockGeminiModels:
         schema_name = getattr(schema, "__name__", str(schema))
         contents_str = str(contents).lower()
 
-        # Handle distribution schema
-        if schema == ConceptQuestionTypeDistribution or "distribution" in schema_name.lower():
-            concept_names = ["Newton's Laws of Motion", "Kinetic Energy"]
-            requested_types = self._parse_requested_types(str(contents))
-            return MockParsedResponse(create_mock_distribution(concept_names, requested_types))
-
         # Handle auto-correct endpoint (returns wrapper with .question)
         if "AutoCorrected" in schema_name:
             if "short_answer" in contents_str:
+
                 class QuestionWrapper:
-                    question = create_mock_short_answer("What is Newton's first law of motion?")
+                    question = create_mock_short_answer(
+                        "What is Newton's first law of motion?"
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
             else:
+
                 class QuestionWrapper:
-                    question = create_mock_mcq4("What is the formula for kinetic energy?")
+                    question = create_mock_mcq4(
+                        "What is the formula for kinetic energy?"
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
 
         # Handle regenerate endpoints (returns wrapper with .question)
         if "Regenerated" in schema_name:
             if "short_answer" in contents_str:
+
                 class QuestionWrapper:
-                    question = create_mock_short_answer("Describe the principle of conservation of momentum.")
+                    question = create_mock_short_answer(
+                        "Describe the principle of conservation of momentum."
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
             else:
+
                 class QuestionWrapper:
-                    question = create_mock_mcq4("Calculate the kinetic energy of a 5kg object moving at 10 m/s.")
+                    question = create_mock_mcq4(
+                        "Calculate the kinetic energy of a 5kg object moving at 10 m/s."
+                    )
+
                 return MockParsedResponse(QuestionWrapper())
 
         # Handle question generation schemas (returns wrapper with .questions list)
@@ -271,7 +203,7 @@ class MockGeminiClient:
 def mock_gemini_client(use_live_gemini):
     """
     Automatically patch genai.Client for all integration tests unless --gemini-live is used.
-    
+
     This patches at the module level where genai.Client is instantiated.
     """
     if use_live_gemini:
@@ -279,10 +211,15 @@ def mock_gemini_client(use_live_gemini):
         yield
     else:
         # Patch genai.Client in all qgen modules
-        with patch("api.v1.qgen.question_generator.genai.Client", MockGeminiClient), \
-             patch("api.v1.qgen.auto_correct_question.genai.Client", MockGeminiClient), \
-             patch("api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient), \
-             patch("api.v1.qgen.regenerate_question_with_prompt.genai.Client", MockGeminiClient):
+        with patch(
+            "api.v1.qgen.question_generator.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.qgen.auto_correct_question.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.qgen.regenerate_question_with_prompt.genai.Client", MockGeminiClient
+        ):
             yield
 
 
@@ -332,11 +269,11 @@ def _get_user_id(auth_response) -> str | None:
 def env(request) -> Dict[str, str]:
     """
     Load and validate required environment variables for integration tests.
-    
+
     GEMINI_API_KEY is only required when --gemini-live flag is used.
     """
     load_dotenv()
-    
+
     use_live_gemini = request.config.getoption("--gemini-live", default=False)
 
     supabase_url = os.getenv("SUPABASE_URL")
@@ -354,7 +291,7 @@ def env(request) -> Dict[str, str]:
         ("TEST_USER_EMAIL", test_user_email),
         ("TEST_USER_PASSWORD", test_user_password),
     ]
-    
+
     # GEMINI_API_KEY only required with --gemini-live
     if use_live_gemini:
         required_vars.append(("GEMINI_API_KEY", gemini_api_key))
@@ -369,7 +306,8 @@ def env(request) -> Dict[str, str]:
         "SUPABASE_SERVICE_KEY": supabase_service_key,
         "TEST_USER_EMAIL": test_user_email,
         "TEST_USER_PASSWORD": test_user_password,
-        "GEMINI_API_KEY": gemini_api_key or "mock-api-key",  # Provide dummy value for mocks
+        "GEMINI_API_KEY": gemini_api_key
+        or "mock-api-key",  # Provide dummy value for mocks
     }
 
 
