@@ -10,6 +10,7 @@ import supabase
 from pydantic import BaseModel, Field
 
 from google import genai
+from .utils.retry import generate_content_with_retries
 from fastapi import Depends, status, HTTPException
 from fastapi.responses import Response
 
@@ -72,13 +73,15 @@ async def regenerate_question_logic(
     Raises:
         Exception: If Gemini API call fails
     """
-    questions_response = await gemini_client.aio.models.generate_content(
+    questions_response = await generate_content_with_retries(
+        gemini_client=gemini_client,
         model="gemini-3-flash-preview",
         contents=regenerate_question_prompt(gen_question_data),
         config={
             "response_mime_type": "application/json",
             "response_schema": RegeneratedQuestion,
         },
+        retries=5,
     )
 
     return questions_response.parsed.question

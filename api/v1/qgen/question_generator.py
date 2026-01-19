@@ -4,12 +4,14 @@ All question generation logic in one place - schemas, prompts, and endpoint.
 """
 
 import asyncio
+import json
 import os
 import logging
 import uuid
 from typing import List, Literal, Dict, Optional
 
 from google import genai
+from .utils.retry import generate_content_with_retries
 from fastapi import Depends, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
@@ -221,10 +223,11 @@ async def generate_questions_for_batches(
 
         try:
             # Use async API call for parallel execution
-            questions_response = await gemini_client.aio.models.generate_content(
+            questions_response = await generate_content_with_retries(
+                gemini_client=gemini_client,
                 model="gemini-3-flash-preview",
                 contents=generate_questions_prompt(
-                    concepts=unique_concepts,  # Use deduplicated concepts
+                    concepts=unique_concepts,
                     concepts_descriptions=concepts_dict,
                     old_questions_on_concepts=old_questions,
                     n=batch.n_questions,
@@ -236,33 +239,75 @@ async def generate_questions_for_batches(
                     "response_mime_type": "application/json",
                     "response_schema": question_schema,
                 },
+                retries=5,
             )
 
             results = []
-            for q in questions_response.parsed.questions:
-                gen_question_dict = {
-                    **q.model_dump(),
-                    "activity_id": str(activity_id),
-                    "question_type": question_type_enum,
-                    "hardness_level": hardness_level,
-                    "marks": default_marks,
-                }
-                # Collect unique concept IDs for this batch
-                concept_ids = list(
-                    dict.fromkeys(
-                        [  # Remove duplicates while preserving order
-                            concepts_name_to_id.get(concept)
-                            for concept in unique_concepts
-                            if concepts_name_to_id.get(concept)
-                        ]
-                    )
+
+            # Get the question model class for individual validation
+            question_model = question_schema.__annotations__.get(
+                "questions"
+            ).__args__[0]
+
+            # Try to get parsed questions, fall back to raw JSON if parsing fails
+            try:
+                questions_list = questions_response.parsed.questions
+            except Exception as parse_error:
+                logger.warning(
+                    f"Failed to parse full response, attempting raw JSON parsing: {parse_error}"
                 )
-                results.append(
-                    {
-                        "question": gen_question_dict,
-                        "concept_ids": concept_ids,
+                # Fall back to parsing raw JSON response
+                raw_text = questions_response.text
+                raw_data = json.loads(raw_text)
+                questions_list = raw_data.get("questions", [])
+
+            for q in questions_list:
+                try:
+                    # If q is already a Pydantic model, use it directly
+                    if hasattr(q, "model_dump"):
+                        question_data = q.model_dump()
+                    else:
+                        # Validate individual question with Pydantic model
+                        validated_q = question_model.model_validate(q)
+                        question_data = validated_q.model_dump()
+
+                    # Skip questions missing the essential field (question_text)
+                    if not question_data.get("question_text"):
+                        logger.warning(
+                            f"Skipping question with missing question_text: {question_data}"
+                        )
+                        continue
+
+                    gen_question_dict = {
+                        **question_data,
+                        "activity_id": str(activity_id),
+                        "question_type": question_type_enum,
+                        "hardness_level": hardness_level,
+                        "marks": default_marks,
                     }
-                )
+                    # Collect unique concept IDs for this batch
+                    concept_ids = list(
+                        dict.fromkeys(
+                            [  # Remove duplicates while preserving order
+                                concepts_name_to_id.get(concept)
+                                for concept in unique_concepts
+                                if concepts_name_to_id.get(concept)
+                            ]
+                        )
+                    )
+                    results.append(
+                        {
+                            "question": gen_question_dict,
+                            "concept_ids": concept_ids,
+                        }
+                    )
+                except Exception as validation_error:
+                    logger.warning(
+                        f"Skipping invalid question due to validation error: {validation_error}. "
+                        f"Question data: {q}"
+                    )
+                    continue
+
             return results
         except Exception as e:
             logger.error(

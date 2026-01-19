@@ -15,6 +15,7 @@ from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
 from .models import AllQuestions
+from .utils.retry import generate_content_with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +75,15 @@ async def auto_correct_question_logic(
     Raises:
         Exception: If Gemini API call fails
     """
-    questions_response = await gemini_client.aio.models.generate_content(
+    questions_response = await generate_content_with_retries(
+        gemini_client=gemini_client,
         model="gemini-3-flash-preview",
         contents=auto_correct_questions_prompt(gen_question_data),
         config={
             "response_mime_type": "application/json",
             "response_schema": AutoCorrectedQuestion,
         },
+        retries=5,
     )
 
     return questions_response.parsed.question

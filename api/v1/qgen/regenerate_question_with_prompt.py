@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from google import genai
 from google.genai import types
+from .utils.retry import generate_content_with_retries
 from fastapi import Depends, status, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
@@ -189,13 +190,15 @@ async def regenerate_question_with_prompt_logic(
     contents.append(types.Part.from_text(text=prompt_text))
 
     # Generate response
-    questions_response = await gemini_client.aio.models.generate_content(
+    questions_response = await generate_content_with_retries(
+        gemini_client=gemini_client,
         model="gemini-2.0-flash",
         contents=contents,
         config={
             "response_mime_type": "application/json",
             "response_schema": RegeneratedQuestionWithPrompt,
         },
+        retries=5,
     )
 
     return questions_response.parsed.question
