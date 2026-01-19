@@ -12,11 +12,11 @@ from pydantic import BaseModel, Field
 
 from google import genai
 from google.genai import types
-from .utils.retry import generate_content_with_retries
 from fastapi import Depends, status, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
+from .utils.retry import generate_content_with_retries
 from .models import AllQuestions
 
 logger = logging.getLogger(__name__)
@@ -216,7 +216,13 @@ async def regenerate_question_with_prompt_logic(
             error_str = str(e).lower()
             is_validation_error = any(
                 keyword in error_str
-                for keyword in ["validation", "field required", "missing", "invalid", "parse"]
+                for keyword in [
+                    "validation",
+                    "field required",
+                    "missing",
+                    "invalid",
+                    "parse",
+                ]
             )
 
             if is_validation_error and attempt < max_validation_retries - 1:

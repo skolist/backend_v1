@@ -11,7 +11,6 @@ import uuid
 from typing import List, Literal, Dict, Optional
 
 from google import genai
-from .utils.retry import generate_content_with_retries
 from fastapi import Depends, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
@@ -25,6 +24,7 @@ from supabase_dir import (
 )
 
 from .utils.batchification import build_batches_end_to_end, Batch
+from .utils.retry import generate_content_with_retries
 from .models import (
     AllQuestions,
     QUESTION_TYPE_TO_SCHEMA,
@@ -245,9 +245,9 @@ async def generate_questions_for_batches(
             results = []
 
             # Get the question model class for individual validation
-            question_model = question_schema.__annotations__.get(
-                "questions"
-            ).__args__[0]
+            question_model = question_schema.__annotations__.get("questions").__args__[
+                0
+            ]
 
             # Try to get parsed questions, fall back to raw JSON if parsing fails
             try:

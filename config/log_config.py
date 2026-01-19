@@ -4,7 +4,6 @@ Logs are written to both console and a timestamped file in the logs/ directory.
 """
 
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 

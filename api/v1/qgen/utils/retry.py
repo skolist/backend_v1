@@ -1,3 +1,7 @@
+"""
+Contains the logic to retry calls to Gemini's generate_content method.
+"""
+
 import asyncio
 import logging
 from typing import Any, Dict, Optional

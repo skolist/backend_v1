@@ -101,7 +101,13 @@ async def auto_correct_question_logic(
             error_str = str(e).lower()
             is_validation_error = any(
                 keyword in error_str
-                for keyword in ["validation", "field required", "missing", "invalid", "parse"]
+                for keyword in [
+                    "validation",
+                    "field required",
+                    "missing",
+                    "invalid",
+                    "parse",
+                ]
             )
 
             if is_validation_error and attempt < max_validation_retries - 1:

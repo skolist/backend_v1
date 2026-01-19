@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize logging configuration (must be imported before other modules)
-import config.log_config  # noqa: F401
+import config.log_config  # pylint: disable=unused-import
 
 from config.settings import DEPLOYMENT_ENV
 from api.v1.router import router as v1_router
