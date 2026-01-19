@@ -157,6 +157,7 @@ async def regenerate_question_with_prompt_logic(
     gen_question_data: dict,
     custom_prompt: Optional[str] = None,
     file_parts: Optional[List[types.Part]] = None,
+    max_validation_retries: int = 5,
 ) -> AllQuestions:
     """
     Regenerate a question using Gemini API with custom prompt and files.
@@ -166,12 +167,13 @@ async def regenerate_question_with_prompt_logic(
         gen_question_data: Dictionary containing question data
         custom_prompt: Optional custom instructions for regeneration
         file_parts: Optional list of Gemini Part objects for attached files
+        max_validation_retries: Max retries if Pydantic validation fails
 
     Returns:
         Regenerated question as AllQuestions type
 
     Raises:
-        Exception: If Gemini API call fails
+        Exception: If Gemini API call fails after all retries
     """
     # Build the prompt text
     prompt_text = regenerate_question_with_prompt_prompt(
@@ -189,19 +191,46 @@ async def regenerate_question_with_prompt_logic(
     # Add the text prompt
     contents.append(types.Part.from_text(text=prompt_text))
 
-    # Generate response
-    questions_response = await generate_content_with_retries(
-        gemini_client=gemini_client,
-        model="gemini-2.0-flash",
-        contents=contents,
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": RegeneratedQuestionWithPrompt,
-        },
-        retries=5,
-    )
+    last_error = None
 
-    return questions_response.parsed.question
+    for attempt in range(max_validation_retries):
+        try:
+            # Generate response
+            questions_response = await generate_content_with_retries(
+                gemini_client=gemini_client,
+                model="gemini-2.0-flash",
+                contents=contents,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": RegeneratedQuestionWithPrompt,
+                },
+                retries=5,
+            )
+
+            # Try to parse the response - this is where Pydantic validation happens
+            return questions_response.parsed.question
+
+        except Exception as e:
+            last_error = e
+            # Check if it's a Pydantic validation error or parsing error
+            error_str = str(e).lower()
+            is_validation_error = any(
+                keyword in error_str
+                for keyword in ["validation", "field required", "missing", "invalid", "parse"]
+            )
+
+            if is_validation_error and attempt < max_validation_retries - 1:
+                logger.warning(
+                    f"Pydantic validation failed (attempt {attempt + 1}/{max_validation_retries}): {e}. "
+                    f"Retrying with new Gemini request..."
+                )
+                continue
+            else:
+                # Not a validation error or last attempt, re-raise
+                raise
+
+    # If we exhausted all retries
+    raise last_error
 
 
 # ============================================================================

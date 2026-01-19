@@ -61,6 +61,7 @@ def auto_correct_questions_prompt(gen_question: dict):
 async def auto_correct_question_logic(
     gemini_client: genai.Client,
     gen_question_data: dict,
+    max_validation_retries: int = 5,
 ) -> AllQuestions:
     """
     Auto-correct a question using Gemini API.
@@ -68,25 +69,53 @@ async def auto_correct_question_logic(
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
+        max_validation_retries: Max retries if Pydantic validation fails
 
     Returns:
         Corrected question as AllQuestions type
 
     Raises:
-        Exception: If Gemini API call fails
+        Exception: If Gemini API call fails after all retries
     """
-    questions_response = await generate_content_with_retries(
-        gemini_client=gemini_client,
-        model="gemini-3-flash-preview",
-        contents=auto_correct_questions_prompt(gen_question_data),
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": AutoCorrectedQuestion,
-        },
-        retries=5,
-    )
+    last_error = None
 
-    return questions_response.parsed.question
+    for attempt in range(max_validation_retries):
+        try:
+            questions_response = await generate_content_with_retries(
+                gemini_client=gemini_client,
+                model="gemini-3-flash-preview",
+                contents=auto_correct_questions_prompt(gen_question_data),
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": AutoCorrectedQuestion,
+                },
+                retries=5,
+            )
+
+            # Try to parse the response - this is where Pydantic validation happens
+            return questions_response.parsed.question
+
+        except Exception as e:
+            last_error = e
+            # Check if it's a Pydantic validation error or parsing error
+            error_str = str(e).lower()
+            is_validation_error = any(
+                keyword in error_str
+                for keyword in ["validation", "field required", "missing", "invalid", "parse"]
+            )
+
+            if is_validation_error and attempt < max_validation_retries - 1:
+                logger.warning(
+                    f"Pydantic validation failed (attempt {attempt + 1}/{max_validation_retries}): {e}. "
+                    f"Retrying with new Gemini request..."
+                )
+                continue
+            else:
+                # Not a validation error or last attempt, re-raise
+                raise
+
+    # If we exhausted all retries
+    raise last_error
 
 
 # ============================================================================
