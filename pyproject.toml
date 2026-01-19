@@ -6,6 +6,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:pyiceberg.*",
     "ignore::DeprecationWarning:supabase.*",
     "ignore::pydantic.PydanticDeprecatedSince212:pyiceberg.*",
+    "ignore::DeprecationWarning:pythonjsonlogger.*",
 ]
 markers = [
     "slow: marks tests as slow (use -m 'not slow' to skip)",

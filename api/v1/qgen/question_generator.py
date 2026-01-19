@@ -240,7 +240,13 @@ def batchify_request(
     Returns:
         List of Batch objects ready for parallel processing
     """
-    logger.debug(f"Starting batchification for {len(concept_names)} concepts")
+    logger.debug(
+        "Starting batchification",
+        extra={
+            "concept_count": len(concept_names),
+            "activity_id": str(request.activity_id),
+        },
+    )
 
     # Extract parameters for batchification
     question_type_counts = extract_question_type_counts_dict(request)
@@ -248,8 +254,13 @@ def batchify_request(
         request.config.difficulty_distribution
     )
 
-    logger.debug(f"Question type counts: {question_type_counts}")
-    logger.debug(f"Difficulty percentages: {difficulty_percentages}")
+    logger.debug(
+        "Batchification parameters extracted",
+        extra={
+            "question_type_counts": question_type_counts,
+            "difficulty_percentages": difficulty_percentages,
+        },
+    )
 
     # Create batches using batchification logic
     batches = build_batches_end_to_end(
@@ -264,7 +275,10 @@ def batchify_request(
         custom_instruction_mode="first",
     )
 
-    logger.debug(f"Created {len(batches)} batches for processing")
+    logger.debug(
+        "Batches created",
+        extra={"batch_count": len(batches)},
+    )
     return batches
 
 
@@ -300,8 +314,14 @@ async def process_batch_generation(
     prefix = _log_prefix(batch_idx, retry_idx)
 
     logger.debug(
-        f"{prefix}Processing batch: type={batch.question_type}, "
-        f"difficulty={batch.difficulty}, n_questions={batch.n_questions}"
+        "Processing batch",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+            "question_type": batch.question_type,
+            "difficulty": batch.difficulty,
+            "n_questions": batch.n_questions,
+        },
     )
 
     # Get schema for this question type
@@ -312,7 +332,13 @@ async def process_batch_generation(
 
     # Deduplicate concepts for this batch
     unique_concepts = list(dict.fromkeys(batch.concepts))
-    logger.debug(f"{prefix}Unique concepts for batch: {unique_concepts}")
+    logger.debug(
+        "Unique concepts for batch",
+        extra={
+            "batch_idx": batch_idx,
+            "unique_concepts": unique_concepts,
+        },
+    )
 
     # Build the prompt
     prompt = generate_questions_prompt(
@@ -325,7 +351,13 @@ async def process_batch_generation(
         instructions=batch.custom_instruction,
     )
 
-    logger.debug(f"{prefix}Making Gemini API call...")
+    logger.debug(
+        "Making Gemini API call",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+        },
+    )
 
     # Single API call - no retries here
     response = await ctx.gemini_client.aio.models.generate_content(
@@ -337,7 +369,14 @@ async def process_batch_generation(
         },
     )
 
-    logger.debug(f"{prefix}Gemini API call completed successfully")
+    logger.debug(
+        "Gemini API call completed",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+            "status": "success",
+        },
+    )
 
     return {
         "response": response,
@@ -379,7 +418,12 @@ async def process_batch_generation_and_validate(
     prefix = _log_prefix(batch_idx, retry_idx)
 
     logger.debug(
-        f"{prefix}Starting generation and validation for type={batch.question_type}"
+        "Starting generation and validation",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+            "question_type": batch.question_type,
+        },
     )
 
     # Step 1: Generate questions
@@ -406,29 +450,60 @@ async def process_batch_generation_and_validate(
     )
 
     # Step 2: Parse response
-    logger.debug(f"{prefix}Parsing Gemini response...")
+    logger.debug(
+        "Parsing Gemini response",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+        },
+    )
 
     try:
         questions_list = response.parsed.questions
         logger.debug(
-            f"{prefix}Successfully parsed {len(questions_list)} questions from response"
+            "Parsed questions from response",
+            extra={
+                "batch_idx": batch_idx,
+                "retry_idx": retry_idx,
+                "question_count": len(questions_list),
+            },
         )
     except Exception as parse_error:
         logger.warning(
-            f"{prefix}Failed to parse structured response, attempting raw JSON: {parse_error}"
+            "Failed to parse structured response, attempting raw JSON",
+            extra={
+                "batch_idx": batch_idx,
+                "retry_idx": retry_idx,
+                "error": str(parse_error),
+            },
         )
         # Fall back to parsing raw JSON response
         raw_text = response.text
         raw_data = json.loads(raw_text)
         questions_list = raw_data.get("questions", [])
-        logger.debug(f"{prefix}Parsed {len(questions_list)} questions from raw JSON")
+        logger.debug(
+            "Parsed questions from raw JSON",
+            extra={
+                "batch_idx": batch_idx,
+                "retry_idx": retry_idx,
+                "question_count": len(questions_list),
+            },
+        )
         raise
 
     # Step 3: Validate each question
     validated_questions = []
 
     for idx, q in enumerate(questions_list):
-        logger.debug(f"{prefix}Validating question {idx + 1}/{len(questions_list)}")
+        logger.debug(
+            "Validating question",
+            extra={
+                "batch_idx": batch_idx,
+                "retry_idx": retry_idx,
+                "question_idx": idx + 1,
+                "total_questions": len(questions_list),
+            },
+        )
 
         try:
             # If q is already a Pydantic model, use it directly
@@ -442,7 +517,12 @@ async def process_batch_generation_and_validate(
             # raise if missing the essential field (question_text)
             if not question_data.get("question_text"):
                 logger.warning(
-                    f"{prefix}Question {idx + 1} missing question_text, skipping"
+                    "Question missing question_text, skipping",
+                    extra={
+                        "batch_idx": batch_idx,
+                        "retry_idx": retry_idx,
+                        "question_idx": idx + 1,
+                    },
                 )
                 raise
 
@@ -472,11 +552,24 @@ async def process_batch_generation_and_validate(
                     "concept_ids": concept_ids,
                 }
             )
-            logger.debug(f"{prefix}Question {idx + 1} validated successfully")
+            logger.debug(
+                "Question validated successfully",
+                extra={
+                    "batch_idx": batch_idx,
+                    "retry_idx": retry_idx,
+                    "question_idx": idx + 1,
+                },
+            )
 
         except Exception as validation_error:
             logger.warning(
-                f"{prefix}Question {idx + 1} validation failed: {validation_error}. Skipping."
+                "Question validation failed, skipping",
+                extra={
+                    "batch_idx": batch_idx,
+                    "retry_idx": retry_idx,
+                    "question_idx": idx + 1,
+                    "error": str(validation_error),
+                },
             )
             continue
 
@@ -487,7 +580,13 @@ async def process_batch_generation_and_validate(
         )
 
     logger.debug(
-        f"{prefix}Batch validation complete: {len(validated_questions)}/{len(questions_list)} valid"
+        "Batch validation complete",
+        extra={
+            "batch_idx": batch_idx,
+            "retry_idx": retry_idx,
+            "valid_count": len(validated_questions),
+            "total_count": len(questions_list),
+        },
     )
 
     return validated_questions
@@ -537,23 +636,40 @@ async def try_retry_batch(
         BatchGenerationError: If all retry attempts fail
     """
     logger.debug(
-        f"{_log_prefix(batch_idx)}Starting retry wrapper (max_retries={max_retries})"
+        "Starting retry wrapper",
+        extra={
+            "batch_idx": batch_idx,
+            "max_retries": max_retries,
+        },
     )
 
     last_exception = None
 
     for attempt in range(max_retries):
         retry_idx = attempt + 1
-        prefix = _log_prefix(batch_idx, retry_idx)
 
         try:
-            logger.debug(f"{prefix}Starting attempt {retry_idx}/{max_retries}")
+            logger.debug(
+                "Starting retry attempt",
+                extra={
+                    "batch_idx": batch_idx,
+                    "retry_idx": retry_idx,
+                    "max_retries": max_retries,
+                },
+            )
 
             result = await process_batch_generation_and_validate(
                 batch, ctx, batch_idx, retry_idx
             )
 
-            logger.debug(f"{prefix}Batch succeeded, generated {len(result)} questions")
+            logger.debug(
+                "Batch succeeded",
+                extra={
+                    "batch_idx": batch_idx,
+                    "retry_idx": retry_idx,
+                    "question_count": len(result),
+                },
+            )
             return result
 
         except Exception as e:
@@ -561,11 +677,23 @@ async def try_retry_batch(
 
             if attempt < max_retries - 1:
                 # Not the last attempt, log and continue
-                logger.warning(f"{prefix}Attempt failed: {e}. Retrying...")
+                logger.warning(
+                    "Attempt failed, retrying",
+                    extra={
+                        "batch_idx": batch_idx,
+                        "retry_idx": retry_idx,
+                        "error": str(e),
+                    },
+                )
             else:
                 # Last attempt failed
                 logger.error(
-                    f"{prefix}All {max_retries} attempts exhausted. Last error: {e}"
+                    "All retry attempts exhausted",
+                    extra={
+                        "batch_idx": batch_idx,
+                        "max_retries": max_retries,
+                        "final_error": str(e),
+                    },
                 )
 
     # All retries exhausted
@@ -612,14 +740,22 @@ async def insert_batch_to_supabase(
     """
     prefix = _log_prefix(batch_idx)
     logger.debug(
-        f"{prefix}Starting insert_batch_to_supabase for type={batch.question_type}"
+        "Starting insert_batch_to_supabase",
+        extra={
+            "batch_idx": batch_idx,
+            "question_type": batch.question_type,
+        },
     )
 
     # Step 1: Generate and validate questions with retries
     questions = await try_retry_batch(batch, batch_idx, ctx, max_retries)
 
     logger.debug(
-        f"{prefix}Got {len(questions)} validated questions, starting DB insertion"
+        "Validated questions ready for DB insertion",
+        extra={
+            "batch_idx": batch_idx,
+            "question_count": len(questions),
+        },
     )
 
     # Step 2: Insert each question into database
@@ -628,7 +764,12 @@ async def insert_batch_to_supabase(
         concept_ids = item["concept_ids"]
 
         logger.debug(
-            f"{prefix}Inserting question {idx + 1}/{len(questions)} into gen_questions"
+            "Inserting question into gen_questions",
+            extra={
+                "batch_idx": batch_idx,
+                "question_idx": idx + 1,
+                "total_questions": len(questions),
+            },
         )
 
         # Validate with GenQuestionsInsert schema before insert
@@ -644,7 +785,13 @@ async def insert_batch_to_supabase(
             inserted_question = result.data[0]
             question_id = inserted_question["id"]
 
-            logger.debug(f"{prefix}Question inserted with id={question_id}")
+            logger.debug(
+                "Question inserted",
+                extra={
+                    "batch_idx": batch_idx,
+                    "question_id": question_id,
+                },
+            )
 
             # Step 3: Create concept-question mappings
             for concept_id in concept_ids:
@@ -658,7 +805,12 @@ async def insert_batch_to_supabase(
                     ).execute()
 
                     logger.debug(
-                        f"{prefix}Created mapping: question_id={question_id}, concept_id={concept_id}"
+                        "Created concept-question mapping",
+                        extra={
+                            "batch_idx": batch_idx,
+                            "question_id": question_id,
+                            "concept_id": concept_id,
+                        },
                     )
 
                 except Exception as mapping_error:
@@ -667,18 +819,31 @@ async def insert_batch_to_supabase(
                         mapping_error
                     ):
                         logger.debug(
-                            f"{prefix}Mapping already exists for question_id={question_id}, "
-                            f"concept_id={concept_id}. Skipping."
+                            "Mapping already exists, skipping",
+                            extra={
+                                "batch_idx": batch_idx,
+                                "question_id": question_id,
+                                "concept_id": concept_id,
+                            },
                         )
                     else:
                         # Log but don't fail the entire batch for mapping errors
                         logger.warning(
-                            f"{prefix}Failed to create mapping for question_id={question_id}, "
-                            f"concept_id={concept_id}: {mapping_error}"
+                            "Failed to create concept-question mapping",
+                            extra={
+                                "batch_idx": batch_idx,
+                                "question_id": question_id,
+                                "concept_id": concept_id,
+                                "error": str(mapping_error),
+                            },
                         )
 
     logger.debug(
-        f"{prefix}Batch insertion complete: {len(questions)} questions inserted"
+        "Batch insertion complete",
+        extra={
+            "batch_idx": batch_idx,
+            "questions_inserted": len(questions),
+        },
     )
     return True
 
@@ -712,7 +877,10 @@ async def process_all_batches(
     Returns:
         Dict with 'successful' count and 'failed' count
     """
-    logger.debug(f"Starting parallel processing of {len(batches)} batches")
+    logger.debug(
+        "Starting parallel batch processing",
+        extra={"batch_count": len(batches)},
+    )
 
     # Create tasks for all batches
     tasks = [
@@ -731,15 +899,30 @@ async def process_all_batches(
 
     for idx, result in enumerate(results):
         batch_idx = idx + 1
-        prefix = _log_prefix(batch_idx)
         if isinstance(result, Exception):
             failed += 1
-            logger.error(f"{prefix}Batch failed: {result}")
+            logger.error(
+                "Batch failed",
+                extra={
+                    "batch_idx": batch_idx,
+                    "error": str(result),
+                },
+            )
         else:
             successful += 1
-            logger.debug(f"{prefix}Batch completed successfully")
+            logger.debug(
+                "Batch completed successfully",
+                extra={"batch_idx": batch_idx},
+            )
 
-    logger.debug(f"All batches processed: {successful} successful, {failed} failed")
+    logger.info(
+        "All batches processed",
+        extra={
+            "successful_batches": successful,
+            "failed_batches": failed,
+            "total_batches": len(batches),
+        },
+    )
 
     return {
         "successful": successful,
@@ -778,15 +961,22 @@ async def generate_questions(
         500 Internal Server Error on failure
     """
     try:
-        logger.debug(
-            f"Received generate_questions request for activity={request.activity_id}"
+        logger.info(
+            "Received generate_questions request",
+            extra={
+                "activity_id": str(request.activity_id),
+                "concept_count": len(request.concept_ids),
+            },
         )
 
         # ====================================================================
         # DATA FETCHING (Supabase)
         # ====================================================================
 
-        logger.debug("Fetching concepts from database...")
+        logger.debug(
+            "Fetching concepts from database",
+            extra={"activity_id": str(request.activity_id)},
+        )
 
         # Fetch concepts from the database
         concepts = (
@@ -797,7 +987,13 @@ async def generate_questions(
             .data
         )
 
-        logger.debug(f"Fetched {len(concepts)} concepts")
+        logger.debug(
+            "Fetched concepts",
+            extra={
+                "activity_id": str(request.activity_id),
+                "concept_count": len(concepts),
+            },
+        )
 
         concepts_dict = {
             concept["name"]: concept["description"] for concept in concepts
@@ -805,7 +1001,10 @@ async def generate_questions(
         concepts_name_to_id = {concept["name"]: concept["id"] for concept in concepts}
 
         # Fetch old questions for reference
-        logger.debug("Fetching historical questions...")
+        logger.debug(
+            "Fetching historical questions",
+            extra={"activity_id": str(request.activity_id)},
+        )
 
         concept_maps = (
             supabase_client.table("bank_questions_concepts_maps")
@@ -827,7 +1026,13 @@ async def generate_questions(
         else:
             old_questions = []
 
-        logger.debug(f"Fetched {len(old_questions)} historical questions")
+        logger.debug(
+            "Fetched historical questions",
+            extra={
+                "activity_id": str(request.activity_id),
+                "historical_question_count": len(old_questions),
+            },
+        )
 
         # ====================================================================
         # BATCHIFICATION
@@ -836,7 +1041,13 @@ async def generate_questions(
         concept_names = [concept["name"] for concept in concepts]
         batches = batchify_request(request, concept_names)
 
-        logger.debug(f"Created {len(batches)} batches")
+        logger.debug(
+            "Batches created for processing",
+            extra={
+                "activity_id": str(request.activity_id),
+                "batch_count": len(batches),
+            },
+        )
 
         # ====================================================================
         # INITIALIZE CONTEXT
@@ -852,7 +1063,10 @@ async def generate_questions(
             activity_id=request.activity_id,
         )
 
-        logger.debug("BatchProcessingContext initialized")
+        logger.debug(
+            "BatchProcessingContext initialized",
+            extra={"activity_id": str(request.activity_id)},
+        )
 
         # ====================================================================
         # PARALLEL BATCH PROCESSING WITH IMMEDIATE INSERTION
@@ -865,12 +1079,25 @@ async def generate_questions(
             max_retries=3,
         )
 
-        logger.debug(
-            f"Generation complete: {result['successful']}/{result['total']} batches successful"
+        logger.info(
+            "Question generation complete",
+            extra={
+                "activity_id": str(request.activity_id),
+                "successful_batches": result["successful"],
+                "failed_batches": result["failed"],
+                "total_batches": result["total"],
+            },
         )
 
         return Response(status_code=status.HTTP_201_CREATED)
 
     except Exception as e:
-        logger.error(f"Error generating questions: {str(e)}", exc_info=True)
+        logger.exception(
+            "Error generating questions",
+            extra={
+                "activity_id": str(request.activity_id),
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -39,9 +39,13 @@ def check_phone_number(
     Checks if a user with the given phone number exists in the public.users table.
     This endpoint is open and does not require authentication.
     """
+    logger.info(
+        "Check phone number request received",
+        extra={"phone_number_hash": hash(request.phone)},
+    )
+
     try:
         # We select only the phone_num to verify existence
-        logger.debug(request.phone)
         response = (
             supabase.table("users")
             .select("phone_num")
@@ -51,10 +55,23 @@ def check_phone_number(
 
         exists = len(response.data) > 0 if response.data else False
 
+        logger.info(
+            "Check phone number completed",
+            extra={
+                "phone_exists": exists,
+            },
+        )
+
         return CheckPhoneResponse(exists=exists)
 
     except Exception as e:
-        logger.error("Error checking phone number: %s", e)
+        logger.exception(
+            "Error checking phone number",
+            extra={
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
         # In case of error, we can return False or raise an exception.
         # Returning False might be safer to avoid leaking error details,
         # but 500 is appropriate for server errors.

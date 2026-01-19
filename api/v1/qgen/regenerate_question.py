@@ -120,11 +120,17 @@ async def process_question(
     """
     prefix = _log_prefix(retry_idx)
 
-    logger.debug(f"{prefix}Processing regenerate for question")
+    logger.debug(
+        "Processing regenerate for question",
+        extra={"retry_idx": retry_idx},
+    )
 
     prompt = regenerate_question_prompt(gen_question_data)
 
-    logger.debug(f"{prefix}Making Gemini API call...")
+    logger.debug(
+        "Making Gemini API call",
+        extra={"retry_idx": retry_idx},
+    )
 
     # Single API call - no retries here
     response = await gemini_client.aio.models.generate_content(
@@ -136,7 +142,13 @@ async def process_question(
         },
     )
 
-    logger.debug(f"{prefix}Gemini API call completed successfully")
+    logger.debug(
+        "Gemini API call completed",
+        extra={
+            "retry_idx": retry_idx,
+            "status": "success",
+        },
+    )
 
     return response
 
@@ -170,27 +182,48 @@ async def process_question_and_validate(
     """
     prefix = _log_prefix(retry_idx)
 
-    logger.debug(f"{prefix}Starting regenerate processing and validation")
+    logger.debug(
+        "Starting regenerate processing and validation",
+        extra={"retry_idx": retry_idx},
+    )
 
     # Step 1: Get response from Gemini
     response = await process_question(gemini_client, gen_question_data, retry_idx)
 
     # Step 2: Parse and validate response
-    logger.debug(f"{prefix}Parsing Gemini response...")
+    logger.debug(
+        "Parsing Gemini response",
+        extra={"retry_idx": retry_idx},
+    )
 
     try:
         regenerated_question = response.parsed.question
-        logger.debug(f"{prefix}Successfully parsed regenerated question")
+        logger.debug(
+            "Successfully parsed regenerated question",
+            extra={"retry_idx": retry_idx},
+        )
     except Exception as parse_error:
-        logger.warning(f"{prefix}Failed to parse response: {parse_error}")
+        logger.warning(
+            "Failed to parse response",
+            extra={
+                "retry_idx": retry_idx,
+                "error": str(parse_error),
+            },
+        )
         raise QuestionValidationError(f"Failed to parse response: {parse_error}")
 
     # Step 3: Validate essential fields
     if not regenerated_question.question_text:
-        logger.warning(f"{prefix}Regenerated question missing question_text")
+        logger.warning(
+            "Regenerated question missing question_text",
+            extra={"retry_idx": retry_idx},
+        )
         raise QuestionValidationError("Regenerated question missing question_text")
 
-    logger.debug(f"{prefix}Question validated successfully")
+    logger.debug(
+        "Question validated successfully",
+        extra={"retry_idx": retry_idx},
+    )
 
     return regenerated_question
 
@@ -226,7 +259,10 @@ async def try_retry_and_update(
     Raises:
         QuestionProcessingError: If all retry attempts fail
     """
-    logger.debug(f"Starting regenerate retry wrapper (max_retries={max_retries})")
+    logger.debug(
+        "Starting regenerate retry wrapper",
+        extra={"max_retries": max_retries},
+    )
 
     last_exception = None
 
@@ -235,13 +271,22 @@ async def try_retry_and_update(
         prefix = _log_prefix(retry_idx)
 
         try:
-            logger.debug(f"{prefix}Starting attempt {retry_idx}/{max_retries}")
+            logger.debug(
+                "Starting retry attempt",
+                extra={
+                    "retry_idx": retry_idx,
+                    "max_retries": max_retries,
+                },
+            )
 
             regenerated_question = await process_question_and_validate(
                 gemini_client, gen_question_data, retry_idx
             )
 
-            logger.debug(f"{prefix}Regenerate succeeded, updating database")
+            logger.debug(
+                "Regenerate succeeded, updating database",
+                extra={"retry_idx": retry_idx},
+            )
 
             # Update the question in the database
             update_data = regenerated_question.model_dump(exclude_none=True)
@@ -249,7 +294,13 @@ async def try_retry_and_update(
                 "id", gen_question_id
             ).execute()
 
-            logger.debug(f"{prefix}Database update completed successfully")
+            logger.debug(
+                "Database update completed successfully",
+                extra={
+                    "retry_idx": retry_idx,
+                    "gen_question_id": gen_question_id,
+                },
+            )
 
             return True
 
@@ -257,9 +308,21 @@ async def try_retry_and_update(
             last_exception = e
 
             if attempt < max_retries - 1:
-                logger.warning(f"{prefix}Attempt failed: {e}. Retrying...")
+                logger.warning(
+                    "Attempt failed, retrying",
+                    extra={
+                        "retry_idx": retry_idx,
+                        "error": str(e),
+                    },
+                )
             else:
-                logger.error(f"{prefix}All {max_retries} attempts exhausted. Last error: {e}")
+                logger.error(
+                    "All retry attempts exhausted",
+                    extra={
+                        "max_retries": max_retries,
+                        "final_error": str(e),
+                    },
+                )
 
     # All retries exhausted
     raise QuestionProcessingError(
@@ -288,7 +351,10 @@ async def regenerate_question(
         404 Not Found if question doesn't exist
         500 Internal Server Error on failure
     """
-    logger.debug(f"Received regenerate request for question_id={gen_question_id}")
+    logger.info(
+        "Received regenerate request",
+        extra={"gen_question_id": gen_question_id},
+    )
 
     # Fetch the question from the database
     try:
@@ -303,12 +369,21 @@ async def regenerate_question(
             raise HTTPException(status_code=404, detail="Gen Question not found")
 
         gen_question_data = gen_question.data[0]
-        logger.debug(f"Fetched question from database")
+        logger.debug(
+            "Fetched question from database",
+            extra={"gen_question_id": gen_question_id},
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching question: {e}")
+        logger.exception(
+            "Error fetching question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     # Process and update question
@@ -323,13 +398,29 @@ async def regenerate_question(
             max_retries=5,
         )
 
-        logger.debug(f"Regenerate completed successfully for question_id={gen_question_id}")
+        logger.info(
+            "Regenerate completed successfully",
+            extra={"gen_question_id": gen_question_id},
+        )
 
     except QuestionProcessingError as e:
-        logger.error(f"Error regenerating question: {e}")
+        logger.exception(
+            "Error regenerating question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
     except Exception as e:
-        logger.error(f"Unexpected error regenerating question: {e}")
+        logger.exception(
+            "Unexpected error regenerating question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     return Response(status_code=status.HTTP_200_OK)

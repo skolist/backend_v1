@@ -67,7 +67,13 @@ def require_supabase_user(
         # Supabase SDK verifies the JWT server-side; no manual decoding here.
         response = supabase.auth.get_user(token)
     except Exception as exc:
-        logger.info("Supabase auth verification failed", exc_info=True)
+        logger.warning(
+            "Supabase auth verification failed",
+            extra={
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

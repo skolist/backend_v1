@@ -123,11 +123,17 @@ async def process_question(
     """
     prefix = _log_prefix(retry_idx)
 
-    logger.debug(f"{prefix}Processing auto-correct for question")
+    logger.debug(
+        "Processing auto-correct for question",
+        extra={"retry_idx": retry_idx},
+    )
 
     prompt = auto_correct_questions_prompt(gen_question_data)
 
-    logger.debug(f"{prefix}Making Gemini API call...")
+    logger.debug(
+        "Making Gemini API call",
+        extra={"retry_idx": retry_idx},
+    )
 
     # Single API call - no retries here
     response = await gemini_client.aio.models.generate_content(
@@ -139,7 +145,13 @@ async def process_question(
         },
     )
 
-    logger.debug(f"{prefix}Gemini API call completed successfully")
+    logger.debug(
+        "Gemini API call completed",
+        extra={
+            "retry_idx": retry_idx,
+            "status": "success",
+        },
+    )
 
     return response
 
@@ -173,27 +185,48 @@ async def process_question_and_validate(
     """
     prefix = _log_prefix(retry_idx)
 
-    logger.debug(f"{prefix}Starting auto-correct processing and validation")
+    logger.debug(
+        "Starting auto-correct processing and validation",
+        extra={"retry_idx": retry_idx},
+    )
 
     # Step 1: Get response from Gemini
     response = await process_question(gemini_client, gen_question_data, retry_idx)
 
     # Step 2: Parse and validate response
-    logger.debug(f"{prefix}Parsing Gemini response...")
+    logger.debug(
+        "Parsing Gemini response",
+        extra={"retry_idx": retry_idx},
+    )
 
     try:
         corrected_question = response.parsed.question
-        logger.debug(f"{prefix}Successfully parsed auto-corrected question")
+        logger.debug(
+            "Successfully parsed auto-corrected question",
+            extra={"retry_idx": retry_idx},
+        )
     except Exception as parse_error:
-        logger.warning(f"{prefix}Failed to parse response: {parse_error}")
+        logger.warning(
+            "Failed to parse response",
+            extra={
+                "retry_idx": retry_idx,
+                "error": str(parse_error),
+            },
+        )
         raise QuestionValidationError(f"Failed to parse response: {parse_error}")
 
     # Step 3: Validate essential fields
     if not corrected_question.question_text:
-        logger.warning(f"{prefix}Corrected question missing question_text")
+        logger.warning(
+            "Corrected question missing question_text",
+            extra={"retry_idx": retry_idx},
+        )
         raise QuestionValidationError("Corrected question missing question_text")
 
-    logger.debug(f"{prefix}Question validated successfully")
+    logger.debug(
+        "Question validated successfully",
+        extra={"retry_idx": retry_idx},
+    )
 
     return corrected_question
 
@@ -229,7 +262,10 @@ async def try_retry_and_update(
     Raises:
         QuestionProcessingError: If all retry attempts fail
     """
-    logger.debug(f"Starting auto-correct retry wrapper (max_retries={max_retries})")
+    logger.debug(
+        "Starting auto-correct retry wrapper",
+        extra={"max_retries": max_retries},
+    )
 
     last_exception = None
 
@@ -238,13 +274,22 @@ async def try_retry_and_update(
         prefix = _log_prefix(retry_idx)
 
         try:
-            logger.debug(f"{prefix}Starting attempt {retry_idx}/{max_retries}")
+            logger.debug(
+                "Starting retry attempt",
+                extra={
+                    "retry_idx": retry_idx,
+                    "max_retries": max_retries,
+                },
+            )
 
             corrected_question = await process_question_and_validate(
                 gemini_client, gen_question_data, retry_idx
             )
 
-            logger.debug(f"{prefix}Auto-correct succeeded, updating database")
+            logger.debug(
+                "Auto-correct succeeded, updating database",
+                extra={"retry_idx": retry_idx},
+            )
 
             # Update the question in the database
             update_data = corrected_question.model_dump(exclude_none=True)
@@ -252,7 +297,13 @@ async def try_retry_and_update(
                 "id", gen_question_id
             ).execute()
 
-            logger.debug(f"{prefix}Database update completed successfully, corrected question data : update_data")
+            logger.debug(
+                "Database update completed successfully",
+                extra={
+                    "retry_idx": retry_idx,
+                    "gen_question_id": gen_question_id,
+                },
+            )
 
             return True
 
@@ -260,9 +311,21 @@ async def try_retry_and_update(
             last_exception = e
 
             if attempt < max_retries - 1:
-                logger.warning(f"{prefix}Attempt failed: {e}. Retrying...")
+                logger.warning(
+                    "Attempt failed, retrying",
+                    extra={
+                        "retry_idx": retry_idx,
+                        "error": str(e),
+                    },
+                )
             else:
-                logger.error(f"{prefix}All {max_retries} attempts exhausted. Last error: {e}")
+                logger.error(
+                    "All retry attempts exhausted",
+                    extra={
+                        "max_retries": max_retries,
+                        "final_error": str(e),
+                    },
+                )
 
     # All retries exhausted
     raise QuestionProcessingError(
@@ -291,7 +354,10 @@ async def auto_correct_question(
         404 Not Found if question doesn't exist
         500 Internal Server Error on failure
     """
-    logger.debug(f"Received auto-correct request for question_id={gen_question_id}")
+    logger.info(
+        "Received auto-correct request",
+        extra={"gen_question_id": gen_question_id},
+    )
 
     # Fetch the question from the database
     try:
@@ -306,12 +372,21 @@ async def auto_correct_question(
             raise HTTPException(status_code=404, detail="Gen Question not found")
 
         gen_question_data = gen_question.data[0]
-        logger.debug(f"Fetched question from database")
+        logger.debug(
+            "Fetched question from database",
+            extra={"gen_question_id": gen_question_id},
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching question: {e}")
+        logger.exception(
+            "Error fetching question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     # Process and update question
@@ -326,13 +401,29 @@ async def auto_correct_question(
             max_retries=5,
         )
 
-        logger.debug(f"Auto-correct completed successfully for question_id={gen_question_id}")
+        logger.info(
+            "Auto-correct completed successfully",
+            extra={"gen_question_id": gen_question_id},
+        )
 
     except QuestionProcessingError as e:
-        logger.error(f"Error auto correcting question: {e}")
+        logger.exception(
+            "Error auto correcting question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
     except Exception as e:
-        logger.error(f"Unexpected error auto correcting question: {e}")
+        logger.exception(
+            "Unexpected error auto correcting question",
+            extra={
+                "gen_question_id": gen_question_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     return Response(status_code=status.HTTP_200_OK)

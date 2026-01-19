@@ -7,7 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize logging configuration (must be imported before other modules)
-import config.logger  # pylint: disable=unused-import
+from config.logger import setup_logging
+setup_logging()
 
 from config.settings import DEPLOYMENT_ENV
 from api.v1.router import router as v1_router
@@ -31,7 +32,13 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        logger.info("🌐 Configuring CORS for production")
+        logger.info(
+            "CORS configured",
+            extra={
+                "deployment_env": DEPLOYMENT_ENV,
+                "allow_origin_pattern": r"https://.*\.skolist\.com",
+            },
+        )
     elif DEPLOYMENT_ENV == "STAGE":
         app.add_middleware(
             CORSMiddleware,
@@ -40,6 +47,13 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        logger.info(
+            "CORS configured",
+            extra={
+                "deployment_env": DEPLOYMENT_ENV,
+                "allow_origin_pattern": r"https://.*\.vercel\.app",
+            },
+        )
     else:
         app.add_middleware(
             CORSMiddleware,
@@ -47,6 +61,13 @@ def create_app() -> FastAPI:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+        logger.info(
+            "CORS configured",
+            extra={
+                "deployment_env": DEPLOYMENT_ENV,
+                "allow_origins": "*",
+            },
         )
 
     @app.get("/")

@@ -26,18 +26,43 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 
-logger.info("Configuration loaded. Environment mode: %s", DEPLOYMENT_ENV)
+logger.info(
+    "Configuration loaded",
+    extra={
+        "deployment_env": DEPLOYMENT_ENV,
+        "logging_level": LOGGING_LEVEL,
+    },
+)
 
 if not SUPABASE_URL:
-    logger.warning("SUPABASE_URL is not set.")
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "SUPABASE_URL"},
+    )
 if not SUPABASE_SERVICE_KEY:
-    logger.warning("SUPABASE_SERVICE_KEY is not set.")
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "SUPABASE_SERVICE_KEY"},
+    )
 if not GEMINI_API_KEY:
-    logger.warning("GEMINI_API_KEY is not set.")
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "GEMINI_API_KEY"},
+    )
 if not OPENAI_API_KEY:
-    logger.warning("OPENAI_API_KEY is not set.")
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "OPENAI_API_KEY"},
+    )
 if not DEPLOYMENT_ENV or DEPLOYMENT_ENV not in {"PRODUCTION", "STAGE", "LOCAL"}:
-    logger.warning("DEPLOYMENT_ENV is not set. Defaulting to LOCAL.")
+    logger.warning(
+        "Invalid or missing DEPLOYMENT_ENV, defaulting to LOCAL",
+        extra={
+            "variable_name": "DEPLOYMENT_ENV",
+            "current_value": DEPLOYMENT_ENV,
+            "default_value": "LOCAL",
+        },
+    )
     DEPLOYMENT_ENV = "LOCAL"
 
 check_gemini_api_key(GEMINI_API_KEY)
