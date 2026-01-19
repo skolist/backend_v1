@@ -1,6 +1,10 @@
 """
-This module contains an api endpoint
-to regenerate a question with a custom prompt and optional files
+Regenerate question with custom prompt API endpoint.
+
+Architecture:
+    1. process_question() - Single Gemini call (no retries)
+    2. process_question_and_validate() - Calls process_question + validates response
+    3. try_retry_and_update() - Retry wrapper (5 retries) + updates Supabase
 """
 
 import os
@@ -16,7 +20,6 @@ from fastapi import Depends, status, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
 from api.v1.auth import get_supabase_client
-from .utils.retry import generate_content_with_retries
 from .models import AllQuestions
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,39 @@ class RegeneratedQuestionWithPrompt(BaseModel):
     """Wrapper for regenerated question from Gemini with custom prompt."""
 
     question: AllQuestions = Field(..., description="The regenerated question")
+
+
+# ============================================================================
+# CUSTOM EXCEPTIONS
+# ============================================================================
+
+
+class QuestionProcessingError(Exception):
+    """Raised when question processing fails after all retries."""
+
+    pass
+
+
+class QuestionValidationError(Exception):
+    """Raised when question validation fails."""
+
+    pass
+
+
+# ============================================================================
+# LOGGING HELPER
+# ============================================================================
+
+
+def _log_prefix(retry_idx: int = None) -> str:
+    """
+    Generate consistent log prefix with RETRY info.
+
+    Format: "RETRY:Y |" or empty string
+    """
+    if retry_idx is not None:
+        return f"RETRY:{retry_idx} | "
+    return ""
 
 
 # ============================================================================
@@ -51,8 +87,17 @@ def regenerate_question_with_prompt_prompt(
     Returns:
         Formatted prompt string
     """
+    latex_instructions = """
+    Common Latex Errors are:
+        1] Not placing inside $$ symbols
+        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
+            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
+        2] For fill in the blanks etc. spaces should use \\_\\_ not some text{{__}} wrapper
+    """
+
+    # Using f-string to avoid issues with curly braces in LaTeX
     if custom_prompt and custom_prompt.strip():
-        prompt = """
+        return f"""
 You are given this question: {gen_question}
 
 The user has provided the following instructions for regenerating this question:
@@ -61,14 +106,14 @@ The user has provided the following instructions for regenerating this question:
 Please regenerate the question according to these instructions while maintaining the same format and structure. 
 If files are attached, use the content from those files to inform your regeneration.
 Return the regenerated question in the same format as the original.
+{latex_instructions}
 """
-        return prompt.format(gen_question=gen_question, custom_prompt=custom_prompt)
 
     # Default behavior: regenerate on similar concepts (same as regenerate_question)
-    prompt = """
+    return f"""
 You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
+{latex_instructions}
 """
-    return prompt.format(gen_question=gen_question)
 
 
 # ============================================================================
@@ -148,33 +193,39 @@ async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
 
 
 # ============================================================================
-# CORE LOGIC FUNCTIONS
+# STEP 1: SINGLE QUESTION PROCESSING (No Retries)
 # ============================================================================
 
 
-async def regenerate_question_with_prompt_logic(
+async def process_question(
     gemini_client: genai.Client,
     gen_question_data: dict,
     custom_prompt: Optional[str] = None,
     file_parts: Optional[List[types.Part]] = None,
-    max_validation_retries: int = 5,
-) -> AllQuestions:
+    retry_idx: int = None,
+) -> dict:
     """
-    Regenerate a question using Gemini API with custom prompt and files.
+    Process a question by calling Gemini API once.
+
+    This function makes a single API call without any retry logic.
 
     Args:
         gemini_client: Initialized Gemini client
         gen_question_data: Dictionary containing question data
         custom_prompt: Optional custom instructions for regeneration
         file_parts: Optional list of Gemini Part objects for attached files
-        max_validation_retries: Max retries if Pydantic validation fails
+        retry_idx: Current retry attempt number (for logging)
 
     Returns:
-        Regenerated question as AllQuestions type
+        Raw response from Gemini API
 
     Raises:
-        Exception: If Gemini API call fails after all retries
+        QuestionProcessingError: If the API call fails
     """
+    prefix = _log_prefix(retry_idx)
+
+    logger.debug(f"{prefix}Processing regenerate with prompt for question")
+
     # Build the prompt text
     prompt_text = regenerate_question_with_prompt_prompt(
         gen_question=gen_question_data,
@@ -186,57 +237,163 @@ async def regenerate_question_with_prompt_logic(
 
     # Add file parts first (if any) so the model can reference them
     if file_parts:
+        logger.debug(f"{prefix}Adding {len(file_parts)} file parts to request")
         contents.extend(file_parts)
 
     # Add the text prompt
     contents.append(types.Part.from_text(text=prompt_text))
 
-    last_error = None
+    logger.debug(f"{prefix}Making Gemini API call...")
 
-    for attempt in range(max_validation_retries):
+    # Single API call - no retries here
+    response = await gemini_client.aio.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": RegeneratedQuestionWithPrompt,
+        },
+    )
+
+    logger.debug(f"{prefix}Gemini API call completed successfully")
+
+    return response
+
+
+# ============================================================================
+# STEP 2: QUESTION PROCESSING + VALIDATION
+# ============================================================================
+
+
+async def process_question_and_validate(
+    gemini_client: genai.Client,
+    gen_question_data: dict,
+    custom_prompt: Optional[str] = None,
+    file_parts: Optional[List[types.Part]] = None,
+    retry_idx: int = None,
+) -> AllQuestions:
+    """
+    Process and validate a question.
+
+    Calls process_question() and then validates the response.
+
+    Args:
+        gemini_client: Initialized Gemini client
+        gen_question_data: Dictionary containing question data
+        custom_prompt: Optional custom instructions for regeneration
+        file_parts: Optional list of Gemini Part objects for attached files
+        retry_idx: Current retry attempt number (for logging)
+
+    Returns:
+        Validated AllQuestions object
+
+    Raises:
+        QuestionValidationError: If validation fails
+        QuestionProcessingError: If the API call fails
+    """
+    prefix = _log_prefix(retry_idx)
+
+    logger.debug(f"{prefix}Starting regenerate with prompt processing and validation")
+
+    # Step 1: Get response from Gemini
+    response = await process_question(
+        gemini_client, gen_question_data, custom_prompt, file_parts, retry_idx
+    )
+
+    # Step 2: Parse and validate response
+    logger.debug(f"{prefix}Parsing Gemini response...")
+
+    try:
+        regenerated_question = response.parsed.question
+        logger.debug(f"{prefix}Successfully parsed regenerated question")
+    except Exception as parse_error:
+        logger.warning(f"{prefix}Failed to parse response: {parse_error}")
+        raise QuestionValidationError(f"Failed to parse response: {parse_error}")
+
+    # Step 3: Validate essential fields
+    if not regenerated_question.question_text:
+        logger.warning(f"{prefix}Regenerated question missing question_text")
+        raise QuestionValidationError("Regenerated question missing question_text")
+
+    logger.debug(f"{prefix}Question validated successfully")
+
+    return regenerated_question
+
+
+# ============================================================================
+# STEP 3: RETRY WRAPPER + SUPABASE UPDATE
+# ============================================================================
+
+
+async def try_retry_and_update(
+    gemini_client: genai.Client,
+    gen_question_data: dict,
+    gen_question_id: str,
+    supabase_client: supabase.Client,
+    custom_prompt: Optional[str] = None,
+    file_parts: Optional[List[types.Part]] = None,
+    max_retries: int = 5,
+) -> bool:
+    """
+    Attempt to process question with retry logic and update Supabase.
+
+    Wraps process_question_and_validate() with configurable retries.
+    On success, updates the question in Supabase.
+
+    Args:
+        gemini_client: Initialized Gemini client
+        gen_question_data: Dictionary containing question data
+        gen_question_id: UUID of the question to update
+        supabase_client: Supabase client for database operations
+        custom_prompt: Optional custom instructions for regeneration
+        file_parts: Optional list of Gemini Part objects for attached files
+        max_retries: Maximum number of retry attempts (default: 5)
+
+    Returns:
+        True if successful
+
+    Raises:
+        QuestionProcessingError: If all retry attempts fail
+    """
+    logger.debug(f"Starting regenerate with prompt retry wrapper (max_retries={max_retries})")
+
+    last_exception = None
+
+    for attempt in range(max_retries):
+        retry_idx = attempt + 1
+        prefix = _log_prefix(retry_idx)
+
         try:
-            # Generate response
-            questions_response = await generate_content_with_retries(
-                gemini_client=gemini_client,
-                model="gemini-2.0-flash",
-                contents=contents,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": RegeneratedQuestionWithPrompt,
-                },
-                retries=5,
+            logger.debug(f"{prefix}Starting attempt {retry_idx}/{max_retries}")
+
+            regenerated_question = await process_question_and_validate(
+                gemini_client, gen_question_data, custom_prompt, file_parts, retry_idx
             )
 
-            # Try to parse the response - this is where Pydantic validation happens
-            return questions_response.parsed.question
+            logger.debug(f"{prefix}Regenerate with prompt succeeded, updating database")
+
+            # Update the question in the database
+            update_data = regenerated_question.model_dump(exclude_none=True)
+            supabase_client.table("gen_questions").update(update_data).eq(
+                "id", gen_question_id
+            ).execute()
+
+            logger.debug(f"{prefix}Database update completed successfully")
+
+            return True
 
         except Exception as e:
-            last_error = e
-            # Check if it's a Pydantic validation error or parsing error
-            error_str = str(e).lower()
-            is_validation_error = any(
-                keyword in error_str
-                for keyword in [
-                    "validation",
-                    "field required",
-                    "missing",
-                    "invalid",
-                    "parse",
-                ]
-            )
+            last_exception = e
 
-            if is_validation_error and attempt < max_validation_retries - 1:
-                logger.warning(
-                    f"Pydantic validation failed (attempt {attempt + 1}/{max_validation_retries}): {e}. "
-                    f"Retrying with new Gemini request..."
-                )
-                continue
+            if attempt < max_retries - 1:
+                logger.warning(f"{prefix}Attempt failed: {e}. Retrying...")
             else:
-                # Not a validation error or last attempt, re-raise
-                raise
+                logger.error(f"{prefix}All {max_retries} attempts exhausted. Last error: {e}")
 
-    # If we exhausted all retries
-    raise last_error
+    # All retries exhausted
+    raise QuestionProcessingError(
+        f"Regenerate with prompt failed after {max_retries} retries"
+    ) from last_exception
 
 
 # ============================================================================
@@ -267,8 +424,10 @@ async def regenerate_question_with_prompt(
         404 Not Found if question doesn't exist
         500 Internal Server Error on failure
     """
+    logger.debug(f"Received regenerate with prompt request for question_id={gen_question_id}")
+
+    # Fetch the question from the database
     try:
-        # Fetch the question from the database
         gen_question = (
             supabase_client.table("gen_questions")
             .select("*")
@@ -280,6 +439,7 @@ async def regenerate_question_with_prompt(
             raise HTTPException(status_code=404, detail="Gen Question not found")
 
         gen_question_data = gen_question.data[0]
+        logger.debug(f"Fetched question from database")
 
     except HTTPException:
         raise
@@ -287,35 +447,33 @@ async def regenerate_question_with_prompt(
         logger.error(f"Error fetching question: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
+    # Process and update question
     try:
         # Process uploaded files if any
         file_parts = None
         if files:
+            logger.debug(f"Processing {len(files)} uploaded files")
             file_parts = await process_uploaded_files(files)
 
-        # Initialize Gemini client and regenerate the question
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        regenerated_question = await regenerate_question_with_prompt_logic(
+
+        await try_retry_and_update(
             gemini_client=gemini_client,
             gen_question_data=gen_question_data,
+            gen_question_id=gen_question_id,
+            supabase_client=supabase_client,
             custom_prompt=prompt,
             file_parts=file_parts,
+            max_retries=5,
         )
 
-    except Exception as e:
+        logger.debug(f"Regenerate with prompt completed successfully for question_id={gen_question_id}")
+
+    except QuestionProcessingError as e:
         logger.error(f"Error regenerating question with prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
-
-    try:
-        # Update the question in the database
-        update_data = regenerated_question.model_dump(exclude_none=True)
-
-        supabase_client.table("gen_questions").update(update_data).eq(
-            "id", gen_question_id
-        ).execute()
-
     except Exception as e:
-        logger.error(f"Error updating question: {e}")
+        logger.error(f"Unexpected error regenerating question with prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
     return Response(status_code=status.HTTP_200_OK)

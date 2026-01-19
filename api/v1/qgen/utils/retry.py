@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 async def generate_content_with_retries(
+    api_endpoint: str,
     gemini_client: genai.Client,
     model: str,
     contents: Any,
@@ -43,7 +44,9 @@ async def generate_content_with_retries(
 
     while attempt < retries:
         try:
-            logger.debug(f"Attempt {attempt + 1} to call Gemini generate_content")
+            logger.debug(
+                f"Attempt {attempt + 1} to call Gemini generate_content for endpoint {api_endpoint}"
+            )
             return await gemini_client.aio.models.generate_content(
                 model=model,
                 contents=contents,
@@ -54,12 +57,12 @@ async def generate_content_with_retries(
             attempt += 1
             if attempt >= retries:
                 logger.error(
-                    f"Gemini generate_content failed after {retries} retries: {e}",
+                    f"Gemini generate_content failed after {retries} retries for endpoint {api_endpoint}: {e}",
                     exc_info=True,
                 )
                 raise last_exc from e
             logger.warning(
-                f"Gemini call failed (attempt {attempt}/{retries}): {e}. Retrying in {delay}s."
+                f"Gemini call failed (attempt {attempt}/{retries}) for endpoint {api_endpoint}: {e}. Retrying in {delay}s."
             )
             await asyncio.sleep(delay)
             delay = min(delay * 2, 16.0)

@@ -1,6 +1,13 @@
 """
 Consolidated Question Generator API
-All question generation logic in one place - schemas, prompts, and endpoint.
+
+Architecture:
+    1. batchify_request() - Creates batches from API request
+    2. process_batch_generation() - Single Gemini call for one batch (no retries)
+    3. process_batch_generation_and_validate() - Wrapper that validates the generated questions
+    4. try_retry_batch() - Retry wrapper with configurable max retries
+    5. insert_batch_to_supabase() - Generates + inserts questions for one batch
+    6. process_all_batches() - Parallel execution of all batches with immediate DB insertion
 """
 
 import asyncio
@@ -8,6 +15,7 @@ import json
 import os
 import logging
 import uuid
+from dataclasses import dataclass
 from typing import List, Literal, Dict, Optional
 
 from google import genai
@@ -24,7 +32,6 @@ from supabase_dir import (
 )
 
 from .utils.batchification import build_batches_end_to_end, Batch
-from .utils.retry import generate_content_with_retries
 from .models import (
     AllQuestions,
     QUESTION_TYPE_TO_SCHEMA,
@@ -81,6 +88,44 @@ class GenerateQuestionsRequest(BaseModel):
 
 
 # ============================================================================
+# BATCH CONTEXT - Holds all data needed for batch processing
+# ============================================================================
+
+
+@dataclass
+class BatchProcessingContext:
+    """
+    Holds all contextual data needed for processing batches.
+
+    This avoids passing many parameters through the function chain.
+    """
+
+    gemini_client: genai.Client
+    concepts_dict: Dict[str, str]  # concept_name -> description
+    concepts_name_to_id: Dict[str, str]  # concept_name -> concept_id
+    old_questions: List[dict]  # historical questions for reference
+    activity_id: uuid.UUID
+    default_marks: int = 1
+
+
+# ============================================================================
+# CUSTOM EXCEPTIONS
+# ============================================================================
+
+
+class BatchGenerationError(Exception):
+    """Raised when batch generation fails after all retries."""
+
+    pass
+
+
+class BatchValidationError(Exception):
+    """Raised when generated questions fail validation."""
+
+    pass
+
+
+# ============================================================================
 # PROMPT FUNCTIONS
 # ============================================================================
 
@@ -94,8 +139,21 @@ def generate_questions_prompt(
     difficulty: str,
     instructions: Optional[str] = None,
 ) -> str:
-    """Generate prompt for creating questions for a batch of concepts."""
+    """
+    Generate prompt for creating questions for a batch of concepts.
 
+    Args:
+        concepts: List of concept names to generate questions for
+        concepts_descriptions: Mapping of concept name to description
+        old_questions_on_concepts: Historical questions for reference
+        n: Number of questions to generate
+        question_type: Type of question (mcq4, short_answer, etc.)
+        difficulty: Difficulty level (easy, medium, hard)
+        instructions: Optional custom instructions from user
+
+    Returns:
+        Formatted prompt string for Gemini
+    """
     # Build concept information
     concept_info = []
     for concept in concepts:
@@ -104,7 +162,14 @@ def generate_questions_prompt(
 
     concepts_text = "\n".join(concept_info)
 
-    prompt = """
+    instructions_block = (
+        f"\nAdditional user instructions (prioritize these): {instructions}"
+        if instructions
+        else ""
+    )
+
+    # Using f-string to avoid issues with curly braces in LaTeX examples
+    return f"""
     You have access to these concepts and their descriptions:
     {concepts_text}
     
@@ -120,23 +185,14 @@ def generate_questions_prompt(
     - Strictly use LaTeX format for mathematical entities like symbols and formulas
     - Strictly output all required fields for the question schema. Answer Text is mandatory, use LaTeX where needed
     - Question should  be Strictly Accurate and High Quality
+
+    Common Latex Errors are:
+        1] Not placing inside $$ symbols
+        Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
+            If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
+        2] For fill in the blanks etc. spaces should use \\_\\_ not some text{{__}} wrapper
     {instructions_block}
     """
-
-    instructions_block = (
-        f"\nAdditional user instructions (prioritize these): {instructions}"
-        if instructions
-        else ""
-    )
-
-    return prompt.format(
-        concepts_text=concepts_text,
-        old_questions_on_concepts=old_questions_on_concepts,
-        n=n,
-        question_type=question_type,
-        difficulty=difficulty,
-        instructions_block=instructions_block,
-    )
 
 
 # ============================================================================
@@ -163,173 +219,537 @@ def extract_difficulty_percentages(
 
 
 # ============================================================================
-# CORE LOGIC FUNCTIONS (No Supabase dependency)
+# STEP 1: BATCHIFICATION
 # ============================================================================
 
 
-async def generate_questions_for_batches(
-    gemini_client: genai.Client,
-    batches: List[Batch],
-    concepts_dict: Dict[str, str],
-    concepts_name_to_id: Dict[str, str],
-    old_questions: List[dict],
-    activity_id: uuid.UUID,
-    default_marks: int = 1,
-) -> List[Dict[str, any]]:
+def batchify_request(
+    request: GenerateQuestionsRequest,
+    concept_names: List[str],
+) -> List[Batch]:
     """
-    Generate questions based on batches using GenAI.
+    Convert API request into a list of batches for parallel processing.
 
-    Uses async parallelization to make concurrent API calls for each batch,
-    significantly reducing total execution time for network-bound operations.
+    Takes the question generation request and breaks it down into smaller
+    batches that can be processed independently and in parallel.
 
     Args:
-        gemini_client: Initialized Gemini client
-        batches: List of batches with question requirements
-        concepts_dict: Mapping of concept name to description
-        concepts_name_to_id: Mapping of concept name to concept ID
-        old_questions: List of historical questions for reference
-        activity_id: UUID of the activity these questions belong to
-        default_marks: Default marks for generated questions
+        request: The incoming API request with question configuration
+        concept_names: List of concept names fetched from database
 
     Returns:
-        List of dicts with 'question' (GenQuestionsInsert-compatible) and 'concept_ids'
+        List of Batch objects ready for parallel processing
     """
+    logger.debug(f"Starting batchification for {len(concept_names)} concepts")
 
-    async def generate_questions_for_batch(
-        batch: Batch,
-    ) -> List[Dict[str, any]]:
-        """Generate questions for a specific batch."""
-        question_schema = QUESTION_TYPE_TO_SCHEMA.get(batch.question_type)
-        question_type_enum = QUESTION_TYPE_TO_ENUM.get(batch.question_type)
+    # Extract parameters for batchification
+    question_type_counts = extract_question_type_counts_dict(request)
+    difficulty_percentages = extract_difficulty_percentages(
+        request.config.difficulty_distribution
+    )
 
-        if not question_schema or not question_type_enum:
-            logger.warning(f"Unknown question type: {batch.question_type}")
-            return []
+    logger.debug(f"Question type counts: {question_type_counts}")
+    logger.debug(f"Difficulty percentages: {difficulty_percentages}")
 
-        # Deduplicate concepts for this batch
-        unique_concepts = list(
-            dict.fromkeys(batch.concepts)
-        )  # Preserves order while removing duplicates
+    # Create batches using batchification logic
+    batches = build_batches_end_to_end(
+        question_type_counts=question_type_counts,
+        concepts=concept_names,
+        difficulty_percent=difficulty_percentages,
+        custom_instruction=request.instructions,
+        max_questions_per_batch=3,
+        seed=None,
+        shuffle_input_concepts=True,
+        custom_instruction_fraction=0.30,
+        custom_instruction_mode="first",
+    )
 
-        # Map difficulty to enum
-        difficulty_mapping = {
-            "easy": PublicHardnessLevelEnumEnum.EASY,
-            "medium": PublicHardnessLevelEnumEnum.MEDIUM,
-            "hard": PublicHardnessLevelEnumEnum.HARD,
-        }
-        hardness_level = difficulty_mapping.get(
-            batch.difficulty, PublicHardnessLevelEnumEnum.MEDIUM
-        )
-
-        try:
-            # Use async API call for parallel execution
-            questions_response = await generate_content_with_retries(
-                gemini_client=gemini_client,
-                model="gemini-3-flash-preview",
-                contents=generate_questions_prompt(
-                    concepts=unique_concepts,
-                    concepts_descriptions=concepts_dict,
-                    old_questions_on_concepts=old_questions,
-                    n=batch.n_questions,
-                    question_type=batch.question_type,
-                    difficulty=batch.difficulty,
-                    instructions=batch.custom_instruction,
-                ),
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": question_schema,
-                },
-                retries=5,
-            )
-
-            results = []
-
-            # Get the question model class for individual validation
-            question_model = question_schema.__annotations__.get("questions").__args__[
-                0
-            ]
-
-            # Try to get parsed questions, fall back to raw JSON if parsing fails
-            try:
-                questions_list = questions_response.parsed.questions
-            except Exception as parse_error:
-                logger.warning(
-                    f"Failed to parse full response, attempting raw JSON parsing: {parse_error}"
-                )
-                # Fall back to parsing raw JSON response
-                raw_text = questions_response.text
-                raw_data = json.loads(raw_text)
-                questions_list = raw_data.get("questions", [])
-
-            for q in questions_list:
-                try:
-                    # If q is already a Pydantic model, use it directly
-                    if hasattr(q, "model_dump"):
-                        question_data = q.model_dump()
-                    else:
-                        # Validate individual question with Pydantic model
-                        validated_q = question_model.model_validate(q)
-                        question_data = validated_q.model_dump()
-
-                    # Skip questions missing the essential field (question_text)
-                    if not question_data.get("question_text"):
-                        logger.warning(
-                            f"Skipping question with missing question_text: {question_data}"
-                        )
-                        continue
-
-                    gen_question_dict = {
-                        **question_data,
-                        "activity_id": str(activity_id),
-                        "question_type": question_type_enum,
-                        "hardness_level": hardness_level,
-                        "marks": default_marks,
-                    }
-                    # Collect unique concept IDs for this batch
-                    concept_ids = list(
-                        dict.fromkeys(
-                            [  # Remove duplicates while preserving order
-                                concepts_name_to_id.get(concept)
-                                for concept in unique_concepts
-                                if concepts_name_to_id.get(concept)
-                            ]
-                        )
-                    )
-                    results.append(
-                        {
-                            "question": gen_question_dict,
-                            "concept_ids": concept_ids,
-                        }
-                    )
-                except Exception as validation_error:
-                    logger.warning(
-                        f"Skipping invalid question due to validation error: {validation_error}. "
-                        f"Question data: {q}"
-                    )
-                    continue
-
-            return results
-        except Exception as e:
-            logger.error(
-                f"Error parsing questions response for batch {batch}: {e}",
-                exc_info=True,
-            )
-            return []
-
-    # Execute all batch API calls in parallel
-    tasks = [generate_questions_for_batch(batch) for batch in batches]
-    results = await asyncio.gather(*tasks)
-
-    # Flatten results
-    gen_questions_data: List[Dict[str, any]] = []
-    for result in results:
-        gen_questions_data.extend(result)
-
-    return gen_questions_data
+    logger.debug(f"Created {len(batches)} batches for processing")
+    return batches
 
 
 # ============================================================================
-# API ENDPOINT (Wrapper with Supabase integration)
+# STEP 2: SINGLE BATCH GENERATION (No Retries)
+# ============================================================================
+
+
+async def process_batch_generation(
+    batch: Batch,
+    ctx: BatchProcessingContext,
+    batch_idx: int = None,
+    retry_idx: int = None,
+) -> dict:
+    """
+    Generate questions for a single batch by calling Gemini API once.
+
+    This function makes a single API call without any retry logic.
+    It returns the raw response from Gemini for further processing.
+
+    Args:
+        batch: The batch containing question requirements
+        ctx: Processing context with client and reference data
+        batch_idx: Index of the batch (for logging)
+        retry_idx: Current retry attempt number (for logging)
+
+    Returns:
+        Raw response dict from Gemini API
+
+    Raises:
+        BatchGenerationError: If the API call fails or returns invalid response
+    """
+    prefix = _log_prefix(batch_idx, retry_idx)
+
+    logger.debug(
+        f"{prefix}Processing batch: type={batch.question_type}, "
+        f"difficulty={batch.difficulty}, n_questions={batch.n_questions}"
+    )
+
+    # Get schema for this question type
+    question_schema = QUESTION_TYPE_TO_SCHEMA.get(batch.question_type)
+
+    if not question_schema:
+        raise BatchGenerationError(f"Unknown question type: {batch.question_type}")
+
+    # Deduplicate concepts for this batch
+    unique_concepts = list(dict.fromkeys(batch.concepts))
+    logger.debug(f"{prefix}Unique concepts for batch: {unique_concepts}")
+
+    # Build the prompt
+    prompt = generate_questions_prompt(
+        concepts=unique_concepts,
+        concepts_descriptions=ctx.concepts_dict,
+        old_questions_on_concepts=ctx.old_questions,
+        n=batch.n_questions,
+        question_type=batch.question_type,
+        difficulty=batch.difficulty,
+        instructions=batch.custom_instruction,
+    )
+
+    logger.debug(f"{prefix}Making Gemini API call...")
+
+    # Single API call - no retries here
+    response = await ctx.gemini_client.aio.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": question_schema,
+        },
+    )
+
+    logger.debug(f"{prefix}Gemini API call completed successfully")
+
+    return {
+        "response": response,
+        "batch": batch,
+        "unique_concepts": unique_concepts,
+    }
+
+
+# ============================================================================
+# STEP 3: BATCH GENERATION + VALIDATION
+# ============================================================================
+
+
+async def process_batch_generation_and_validate(
+    batch: Batch,
+    ctx: BatchProcessingContext,
+    batch_idx: int = None,
+    retry_idx: int = None,
+) -> List[Dict[str, any]]:
+    """
+    Generate questions for a batch and validate each question.
+
+    Calls process_batch_generation() and then validates each question
+    against the Pydantic schema. Invalid questions are filtered out.
+
+    Args:
+        batch: The batch containing question requirements
+        ctx: Processing context with client and reference data
+        batch_idx: Index of the batch (for logging)
+        retry_idx: Current retry attempt number (for logging)
+
+    Returns:
+        List of validated question dicts with 'question' and 'concept_ids' keys
+
+    Raises:
+        BatchValidationError: If no valid questions could be generated
+        BatchGenerationError: If the API call itself fails
+    """
+    prefix = _log_prefix(batch_idx, retry_idx)
+
+    logger.debug(
+        f"{prefix}Starting generation and validation for type={batch.question_type}"
+    )
+
+    # Step 1: Generate questions
+    generation_result = await process_batch_generation(batch, ctx, batch_idx, retry_idx)
+
+    response = generation_result["response"]
+    unique_concepts = generation_result["unique_concepts"]
+
+    # Get schema and enum for validation
+    question_schema = QUESTION_TYPE_TO_SCHEMA.get(batch.question_type)
+    question_type_enum = QUESTION_TYPE_TO_ENUM.get(batch.question_type)
+
+    # Get the question model class for individual validation
+    question_model = question_schema.__annotations__.get("questions").__args__[0]
+
+    # Map difficulty to enum
+    difficulty_mapping = {
+        "easy": PublicHardnessLevelEnumEnum.EASY,
+        "medium": PublicHardnessLevelEnumEnum.MEDIUM,
+        "hard": PublicHardnessLevelEnumEnum.HARD,
+    }
+    hardness_level = difficulty_mapping.get(
+        batch.difficulty, PublicHardnessLevelEnumEnum.MEDIUM
+    )
+
+    # Step 2: Parse response
+    logger.debug(f"{prefix}Parsing Gemini response...")
+
+    try:
+        questions_list = response.parsed.questions
+        logger.debug(
+            f"{prefix}Successfully parsed {len(questions_list)} questions from response"
+        )
+    except Exception as parse_error:
+        logger.warning(
+            f"{prefix}Failed to parse structured response, attempting raw JSON: {parse_error}"
+        )
+        # Fall back to parsing raw JSON response
+        raw_text = response.text
+        raw_data = json.loads(raw_text)
+        questions_list = raw_data.get("questions", [])
+        logger.debug(f"{prefix}Parsed {len(questions_list)} questions from raw JSON")
+        raise
+
+    # Step 3: Validate each question
+    validated_questions = []
+
+    for idx, q in enumerate(questions_list):
+        logger.debug(f"{prefix}Validating question {idx + 1}/{len(questions_list)}")
+
+        try:
+            # If q is already a Pydantic model, use it directly
+            if hasattr(q, "model_dump"):
+                question_data = q.model_dump()
+            else:
+                # Validate individual question with Pydantic model
+                validated_q = question_model.model_validate(q)
+                question_data = validated_q.model_dump()
+
+            # raise if missing the essential field (question_text)
+            if not question_data.get("question_text"):
+                logger.warning(
+                    f"{prefix}Question {idx + 1} missing question_text, skipping"
+                )
+                raise
+
+            # Build the final question dict
+            gen_question_dict = {
+                **question_data,
+                "activity_id": str(ctx.activity_id),
+                "question_type": question_type_enum,
+                "hardness_level": hardness_level,
+                "marks": ctx.default_marks,
+            }
+
+            # Collect unique concept IDs for this batch
+            concept_ids = list(
+                dict.fromkeys(
+                    [
+                        ctx.concepts_name_to_id.get(concept)
+                        for concept in unique_concepts
+                        if ctx.concepts_name_to_id.get(concept)
+                    ]
+                )
+            )
+
+            validated_questions.append(
+                {
+                    "question": gen_question_dict,
+                    "concept_ids": concept_ids,
+                }
+            )
+            logger.debug(f"{prefix}Question {idx + 1} validated successfully")
+
+        except Exception as validation_error:
+            logger.warning(
+                f"{prefix}Question {idx + 1} validation failed: {validation_error}. Skipping."
+            )
+            continue
+
+    # Check if we got any valid questions
+    if not validated_questions:
+        raise BatchValidationError(
+            f"No valid questions generated for batch: {batch.question_type}"
+        )
+
+    logger.debug(
+        f"{prefix}Batch validation complete: {len(validated_questions)}/{len(questions_list)} valid"
+    )
+
+    return validated_questions
+
+
+# ============================================================================
+# STEP 4: RETRY WRAPPER
+# ============================================================================
+
+
+def _log_prefix(batch_idx: int = None, retry_idx: int = None) -> str:
+    """
+    Generate consistent log prefix with BATCH and RETRY info.
+
+    Format: "BATCH:X RETRY:Y |" or "BATCH:X |" or empty string
+    """
+    parts = []
+    if batch_idx is not None:
+        parts.append(f"BATCH:{batch_idx}")
+    if retry_idx is not None:
+        parts.append(f"RETRY:{retry_idx}")
+    return f"{' '.join(parts)} | " if parts else ""
+
+
+async def try_retry_batch(
+    batch: Batch,
+    batch_idx: int,
+    ctx: BatchProcessingContext,
+    max_retries: int = 3,
+) -> List[Dict[str, any]]:
+    """
+    Attempt to generate and validate a batch with retry logic.
+
+    Wraps process_batch_generation_and_validate() with configurable retries.
+    On failure, logs the error and retries until max_retries is reached.
+
+    Args:
+        batch: The batch to process
+        batch_idx : Index of the batch to process
+        ctx: Processing context with client and reference data
+        max_retries: Maximum number of retry attempts (default: 3)
+
+    Returns:
+        List of validated question dicts
+
+    Raises:
+        BatchGenerationError: If all retry attempts fail
+    """
+    logger.debug(
+        f"{_log_prefix(batch_idx)}Starting retry wrapper (max_retries={max_retries})"
+    )
+
+    last_exception = None
+
+    for attempt in range(max_retries):
+        retry_idx = attempt + 1
+        prefix = _log_prefix(batch_idx, retry_idx)
+
+        try:
+            logger.debug(f"{prefix}Starting attempt {retry_idx}/{max_retries}")
+
+            result = await process_batch_generation_and_validate(
+                batch, ctx, batch_idx, retry_idx
+            )
+
+            logger.debug(f"{prefix}Batch succeeded, generated {len(result)} questions")
+            return result
+
+        except Exception as e:
+            last_exception = e
+
+            if attempt < max_retries - 1:
+                # Not the last attempt, log and continue
+                logger.warning(f"{prefix}Attempt failed: {e}. Retrying...")
+            else:
+                # Last attempt failed
+                logger.error(
+                    f"{prefix}All {max_retries} attempts exhausted. Last error: {e}"
+                )
+
+    # All retries exhausted
+    raise BatchGenerationError(
+        f"Batch generation failed after {max_retries} retries"
+    ) from last_exception
+
+
+# ============================================================================
+# STEP 5: INSERT BATCH TO SUPABASE
+# ============================================================================
+
+
+async def insert_batch_to_supabase(
+    batch: Batch,
+    batch_idx: int,
+    ctx: BatchProcessingContext,
+    supabase_client: supabase.Client,
+    max_retries: int = 3,
+) -> bool:
+    """
+    Generate questions for a batch and immediately insert into Supabase.
+
+    This is the per-batch worker function that:
+    1. Generates and validates questions using try_retry_batch()
+    2. Inserts each question into gen_questions table
+    3. Creates concept-question mappings
+
+    Questions are inserted as soon as they're ready, enabling faster
+    availability to end users.
+
+    Args:
+        batch: The batch to process
+        batch_idx : Index of the batch to process
+        ctx: Processing context with client and reference data
+        supabase_client: Supabase client for database operations
+        max_retries: Maximum retry attempts for generation
+
+    Returns:
+        True if batch was processed successfully (even if some mappings failed)
+
+    Raises:
+        BatchGenerationError: If generation fails after all retries
+    """
+    prefix = _log_prefix(batch_idx)
+    logger.debug(
+        f"{prefix}Starting insert_batch_to_supabase for type={batch.question_type}"
+    )
+
+    # Step 1: Generate and validate questions with retries
+    questions = await try_retry_batch(batch, batch_idx, ctx, max_retries)
+
+    logger.debug(
+        f"{prefix}Got {len(questions)} validated questions, starting DB insertion"
+    )
+
+    # Step 2: Insert each question into database
+    for idx, item in enumerate(questions):
+        question_data = item["question"]
+        concept_ids = item["concept_ids"]
+
+        logger.debug(
+            f"{prefix}Inserting question {idx + 1}/{len(questions)} into gen_questions"
+        )
+
+        # Validate with GenQuestionsInsert schema before insert
+        gen_question_insert = GenQuestionsInsert(**question_data)
+
+        result = (
+            supabase_client.table("gen_questions")
+            .insert(gen_question_insert.model_dump(mode="json", exclude_none=True))
+            .execute()
+        )
+
+        if result.data:
+            inserted_question = result.data[0]
+            question_id = inserted_question["id"]
+
+            logger.debug(f"{prefix}Question inserted with id={question_id}")
+
+            # Step 3: Create concept-question mappings
+            for concept_id in concept_ids:
+                try:
+                    concept_map = GenQuestionsConceptsMapsInsert(
+                        gen_question_id=question_id,
+                        concept_id=concept_id,
+                    )
+                    supabase_client.table("gen_questions_concepts_maps").insert(
+                        concept_map.model_dump(mode="json", exclude_none=True)
+                    ).execute()
+
+                    logger.debug(
+                        f"{prefix}Created mapping: question_id={question_id}, concept_id={concept_id}"
+                    )
+
+                except Exception as mapping_error:
+                    # Handle duplicate key constraint violations gracefully
+                    if "duplicate key value violates unique constraint" in str(
+                        mapping_error
+                    ):
+                        logger.debug(
+                            f"{prefix}Mapping already exists for question_id={question_id}, "
+                            f"concept_id={concept_id}. Skipping."
+                        )
+                    else:
+                        # Log but don't fail the entire batch for mapping errors
+                        logger.warning(
+                            f"{prefix}Failed to create mapping for question_id={question_id}, "
+                            f"concept_id={concept_id}: {mapping_error}"
+                        )
+
+    logger.debug(
+        f"{prefix}Batch insertion complete: {len(questions)} questions inserted"
+    )
+    return True
+
+
+# ============================================================================
+# STEP 6: PROCESS ALL BATCHES IN PARALLEL
+# ============================================================================
+
+
+async def process_all_batches(
+    batches: List[Batch],
+    ctx: BatchProcessingContext,
+    supabase_client: supabase.Client,
+    max_retries: int = 3,
+) -> Dict[str, any]:
+    """
+    Process all batches in parallel with immediate database insertion.
+
+    Runs insert_batch_to_supabase() for each batch concurrently using
+    asyncio.gather(). Questions are inserted into the database as soon
+    as each batch completes, enabling faster availability to users.
+
+    Failed batches are logged but don't stop other batches from completing.
+
+    Args:
+        batches: List of batches to process
+        ctx: Processing context with client and reference data
+        supabase_client: Supabase client for database operations
+        max_retries: Maximum retry attempts per batch
+
+    Returns:
+        Dict with 'successful' count and 'failed' count
+    """
+    logger.debug(f"Starting parallel processing of {len(batches)} batches")
+
+    # Create tasks for all batches
+    tasks = [
+        insert_batch_to_supabase(
+            batch, batch_idx + 1, ctx, supabase_client, max_retries
+        )
+        for batch_idx, batch in enumerate(batches)
+    ]
+
+    # Run all batches in parallel, return_exceptions=True to not fail fast
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Count successes and failures
+    successful = 0
+    failed = 0
+
+    for idx, result in enumerate(results):
+        batch_idx = idx + 1
+        prefix = _log_prefix(batch_idx)
+        if isinstance(result, Exception):
+            failed += 1
+            logger.error(f"{prefix}Batch failed: {result}")
+        else:
+            successful += 1
+            logger.debug(f"{prefix}Batch completed successfully")
+
+    logger.debug(f"All batches processed: {successful} successful, {failed} failed")
+
+    return {
+        "successful": successful,
+        "failed": failed,
+        "total": len(batches),
+    }
+
+
+# ============================================================================
+# API ENDPOINT
 # ============================================================================
 
 
@@ -340,21 +760,33 @@ async def generate_questions(
     """
     Generate questions based on concepts and configuration.
 
-    This endpoint orchestrates:
+    This endpoint orchestrates the question generation pipeline:
     1. Fetches concepts and historical questions from Supabase
-    2. Calls generate_distribution() to get question distribution
-    3. Calls generate_questions_for_distribution() to create questions (parallelized)
-    4. Inserts generated questions into gen_questions table
-    5. Creates concept-question mappings in gen_questions_concepts_maps table
+    2. Batchifies the request into smaller parallel units
+    3. Processes all batches in parallel
+    4. Each batch inserts questions immediately upon completion
+
+    Questions become available in the database as soon as each batch
+    completes, rather than waiting for all batches to finish.
+
+    Args:
+        request: The question generation request
+        supabase_client: Injected Supabase client
 
     Returns:
         201 Created on success
         500 Internal Server Error on failure
     """
     try:
+        logger.debug(
+            f"Received generate_questions request for activity={request.activity_id}"
+        )
+
         # ====================================================================
         # DATA FETCHING (Supabase)
         # ====================================================================
+
+        logger.debug("Fetching concepts from database...")
 
         # Fetch concepts from the database
         concepts = (
@@ -364,13 +796,17 @@ async def generate_questions(
             .execute()
             .data
         )
+
+        logger.debug(f"Fetched {len(concepts)} concepts")
+
         concepts_dict = {
             concept["name"]: concept["description"] for concept in concepts
         }
         concepts_name_to_id = {concept["name"]: concept["id"] for concept in concepts}
 
-        # Fetch old questions for these concepts via the mapping table
-        # First get the bank_question_ids from the mapping table
+        # Fetch old questions for reference
+        logger.debug("Fetching historical questions...")
+
         concept_maps = (
             supabase_client.table("bank_questions_concepts_maps")
             .select("bank_question_id")
@@ -380,7 +816,6 @@ async def generate_questions(
         )
         bank_question_ids = list({m["bank_question_id"] for m in concept_maps})
 
-        # Then fetch the bank questions
         if bank_question_ids:
             old_questions = (
                 supabase_client.table("bank_questions")
@@ -392,87 +827,47 @@ async def generate_questions(
         else:
             old_questions = []
 
+        logger.debug(f"Fetched {len(old_questions)} historical questions")
+
         # ====================================================================
-        # QUESTION GENERATION (Batchified Logic)
+        # BATCHIFICATION
         # ====================================================================
 
-        # Extract parameters for batchification
-        question_type_counts = extract_question_type_counts_dict(request)
-        difficulty_percentages = extract_difficulty_percentages(
-            request.config.difficulty_distribution
-        )
         concept_names = [concept["name"] for concept in concepts]
+        batches = batchify_request(request, concept_names)
 
-        # Create batches using batchification logic
-        batches = build_batches_end_to_end(
-            question_type_counts=question_type_counts,
-            concepts=concept_names,
-            difficulty_percent=difficulty_percentages,
-            custom_instruction=request.instructions,
-            max_questions_per_batch=3,
-            seed=None,
-            shuffle_input_concepts=True,
-            custom_instruction_fraction=0.30,
-            custom_instruction_mode="first",
-        )
+        logger.debug(f"Created {len(batches)} batches")
 
-        # Initialize Gemini client
+        # ====================================================================
+        # INITIALIZE CONTEXT
+        # ====================================================================
+
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-        # Generate questions for all batches (parallelized)
-        gen_questions_data = await generate_questions_for_batches(
+        ctx = BatchProcessingContext(
             gemini_client=gemini_client,
-            batches=batches,
             concepts_dict=concepts_dict,
             concepts_name_to_id=concepts_name_to_id,
             old_questions=old_questions,
             activity_id=request.activity_id,
         )
 
+        logger.debug("BatchProcessingContext initialized")
+
         # ====================================================================
-        # DATABASE INSERTION (Supabase)
+        # PARALLEL BATCH PROCESSING WITH IMMEDIATE INSERTION
         # ====================================================================
 
-        for item in gen_questions_data:
-            question_data = item["question"]
-            concept_ids = item["concept_ids"]
+        result = await process_all_batches(
+            batches=batches,
+            ctx=ctx,
+            supabase_client=supabase_client,
+            max_retries=3,
+        )
 
-            # Validate and insert question into gen_questions table
-            gen_question_insert = GenQuestionsInsert(**question_data)
-            result = (
-                supabase_client.table("gen_questions")
-                .insert(gen_question_insert.model_dump(mode="json", exclude_none=True))
-                .execute()
-            )
-
-            if result.data:
-                inserted_question = result.data[0]
-                question_id = inserted_question["id"]
-
-                # Create concept-question mappings for all unique concepts in the batch
-                for concept_id in concept_ids:
-                    try:
-                        concept_map = GenQuestionsConceptsMapsInsert(
-                            gen_question_id=question_id,
-                            concept_id=concept_id,
-                        )
-                        supabase_client.table("gen_questions_concepts_maps").insert(
-                            concept_map.model_dump(mode="json", exclude_none=True)
-                        ).execute()
-                    except Exception as mapping_error:
-                        # Handle duplicate key constraint violations (ignore duplicates)
-                        if "duplicate key value violates unique constraint" in str(
-                            mapping_error
-                        ):
-                            logger.info(
-                                f"""
-                        Concept-question mapping already exists for question_id={question_id},
-                        concept_id={concept_id}. Skipping.
-                                """
-                            )
-                        else:
-                            # Re-raise if it's a different error
-                            raise mapping_error
+        logger.debug(
+            f"Generation complete: {result['successful']}/{result['total']} batches successful"
+        )
 
         return Response(status_code=status.HTTP_201_CREATED)
 
