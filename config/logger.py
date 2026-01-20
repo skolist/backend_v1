@@ -192,6 +192,8 @@ def setup_logging() -> None:
         "uvicorn.access",
         "openai",
         "openai._base_client",
+        "multipart",
+        "python_multipart",
     ]
     for noisy_logger in noisy_loggers:
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)

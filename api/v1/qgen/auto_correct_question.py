@@ -21,9 +21,10 @@ from google.genai import types
 from fastapi import Depends, status, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
-from api.v1.auth import get_supabase_client
+from api.v1.auth import get_supabase_client, require_supabase_user
 from .models import AllQuestions
 from .prompts import auto_correct_questions_prompt
+from .credits import check_user_has_credits, deduct_user_credits
 
 logger = logging.getLogger(__name__)
 
@@ -446,6 +447,7 @@ async def auto_correct_question(
         default=None, description="Optional image to attach for context"
     ),
     supabase_client: supabase.Client = Depends(get_supabase_client),
+    user: dict = Depends(require_supabase_user),
 ):
     """
     API endpoint to auto-correct a question written in frontend.
@@ -454,17 +456,25 @@ async def auto_correct_question(
         gen_question_id: UUID of the question to correct
         image: Optional image file to attach for context
         supabase_client: Supabase client with authentication
+        user: Authenticated user
 
     Returns:
         200 OK on success
         404 Not Found if question doesn't exist
         500 Internal Server Error on failure
     """
+    user_id = user.id
+    
+    # Check credits
+    if not check_user_has_credits(user_id):
+        return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
+
     logger.info(
         "Received auto-correct request",
         extra={
             "gen_question_id": gen_question_id,
             "has_image": image is not None and image.filename is not None,
+            "user_id": user_id,
         },
     )
 
@@ -522,6 +532,9 @@ async def auto_correct_question(
             image_part=image_part,
             max_retries=5,
         )
+        
+        # Deduct 2 credits
+        deduct_user_credits(user_id, 2)
 
         logger.info(
             "Auto-correct completed successfully",

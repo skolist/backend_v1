@@ -38,6 +38,8 @@ from .models import (
     QUESTION_TYPE_TO_ENUM,
 )
 from .prompts import generate_questions_prompt
+from .credits import check_user_has_credits, deduct_user_credits
+from api.v1.auth import require_supabase_user
 
 logger = logging.getLogger(__name__)
 
@@ -644,7 +646,7 @@ async def insert_batch_to_supabase(
     ctx: BatchProcessingContext,
     supabase_client: supabase.Client,
     max_retries: int = 3,
-) -> bool:
+) -> int:
     """
     Generate questions for a batch and immediately insert into Supabase.
 
@@ -664,8 +666,8 @@ async def insert_batch_to_supabase(
         max_retries: Maximum retry attempts for generation
 
     Returns:
-        True if batch was processed successfully (even if some mappings failed)
-
+        Number of questions successfully inserted
+    
     Raises:
         BatchGenerationError: If generation fails after all retries
     """
@@ -688,6 +690,8 @@ async def insert_batch_to_supabase(
             "question_count": len(questions),
         },
     )
+
+    inserted_count = 0
 
     # Step 2: Insert each question into database
     for idx, item in enumerate(questions):
@@ -715,6 +719,7 @@ async def insert_batch_to_supabase(
         if result.data:
             inserted_question = result.data[0]
             question_id = inserted_question["id"]
+            inserted_count += 1
 
             logger.debug(
                 "Question inserted",
@@ -773,10 +778,10 @@ async def insert_batch_to_supabase(
         "Batch insertion complete",
         extra={
             "batch_idx": batch_idx,
-            "questions_inserted": len(questions),
+            "questions_inserted": inserted_count,
         },
     )
-    return True
+    return inserted_count
 
 
 # ============================================================================
@@ -806,7 +811,7 @@ async def process_all_batches(
         max_retries: Maximum retry attempts per batch
 
     Returns:
-        Dict with 'successful' count and 'failed' count
+        Dict with 'successful' count, 'failed' count, and 'questions_inserted' count
     """
     logger.debug(
         "Starting parallel batch processing",
@@ -824,9 +829,10 @@ async def process_all_batches(
     # Run all batches in parallel, return_exceptions=True to not fail fast
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Count successes and failures
+    # Count successes, failures, and inserted questions
     successful = 0
     failed = 0
+    questions_inserted = 0
 
     for idx, result in enumerate(results):
         batch_idx = idx + 1
@@ -841,9 +847,15 @@ async def process_all_batches(
             )
         else:
             successful += 1
+            # Result of insert_batch_to_supabase is the number of questions inserted (int)
+            questions_inserted += result if isinstance(result, int) else 0
+            
             logger.debug(
                 "Batch completed successfully",
-                extra={"batch_idx": batch_idx},
+                extra={
+                    "batch_idx": batch_idx, 
+                    "questions_count": result if isinstance(result, int) else "unknown"
+                },
             )
 
     logger.info(
@@ -852,6 +864,7 @@ async def process_all_batches(
             "successful_batches": successful,
             "failed_batches": failed,
             "total_batches": len(batches),
+            "questions_inserted": questions_inserted,
         },
     )
 
@@ -859,6 +872,7 @@ async def process_all_batches(
         "successful": successful,
         "failed": failed,
         "total": len(batches),
+        "questions_inserted": questions_inserted,
     }
 
 
@@ -870,6 +884,7 @@ async def process_all_batches(
 async def generate_questions(
     request: GenerateQuestionsRequest,
     supabase_client: supabase.Client = Depends(get_supabase_client),
+    user: dict = Depends(require_supabase_user),
 ) -> Response:
     """
     Generate questions based on concepts and configuration.
@@ -886,17 +901,26 @@ async def generate_questions(
     Args:
         request: The question generation request
         supabase_client: Injected Supabase client
+        user: The authenticated user
 
     Returns:
         201 Created on success
         500 Internal Server Error on failure
     """
     try:
+        user_id = user.id
+        
+        # Check if user has credits
+        if not check_user_has_credits(user_id):
+            logger.warning(f"User {user_id} has insufficient credits to generate questions.")
+            return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
+
         logger.info(
             "Received generate_questions request",
             extra={
                 "activity_id": str(request.activity_id),
                 "concept_count": len(request.concept_ids),
+                "user_id": str(user_id),
             },
         )
 
@@ -1009,6 +1033,13 @@ async def generate_questions(
             supabase_client=supabase_client,
             max_retries=3,
         )
+        
+        # Calculate credits to deduct (5 credits per inserted question)
+        questions_inserted = result.get("questions_inserted", 0)
+        credits_to_deduct = questions_inserted * 5
+        
+        if credits_to_deduct > 0:
+            deduct_user_credits(user_id, credits_to_deduct)
 
         logger.info(
             "Question generation complete",
@@ -1017,6 +1048,8 @@ async def generate_questions(
                 "successful_batches": result["successful"],
                 "failed_batches": result["failed"],
                 "total_batches": result["total"],
+                "questions_inserted": questions_inserted,
+                "credits_deducted": credits_to_deduct,
             },
         )
 
