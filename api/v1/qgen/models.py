@@ -192,3 +192,19 @@ QUESTION_TYPE_TO_FIELD = {
     "short_answer": "total_short_answers",
     "long_answer": "total_long_answers",
 }
+
+
+# Feedback models
+class FeedbackItem(BaseModel):
+    """Individual feedback item."""
+
+    message: str = Field(..., description="Feedback message")
+    priority: int = Field(..., description="Priority level (1-10)")
+
+
+class FeedbackList(BaseModel):
+    """List of feedback items."""
+
+    feedbacks: List[FeedbackItem] = Field(
+        ..., description="List of feedback items with message and priority"
+    )
