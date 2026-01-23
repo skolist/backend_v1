@@ -9,18 +9,13 @@ from pydantic import BaseModel
 from playwright.async_api import async_playwright
 
 from api.v1.auth import get_supabase_client
+from api.v1.qgen.utils.paper_utils import fetch_paper_data, format_duration
 
 logger = logging.getLogger(__name__)
 
 class DownloadPdfRequest(BaseModel):
     draft_id: str
     mode: str  # "paper" or "answer"
-
-def format_duration(d_time: Optional[time]) -> str:
-    if not d_time:
-        return "60 Mins"
-    total_minutes = d_time.hour * 60 + d_time.minute
-    return f"{total_minutes} Mins" if total_minutes > 0 else "60 Mins"
 
 async def download_pdf(
     download_req: DownloadPdfRequest,
@@ -32,51 +27,15 @@ async def download_pdf(
     """
     logger.info("Received download_pdf request", extra={"draft_id": download_req.draft_id, "mode": download_req.mode})
 
-    try:
-        # 1. Fetch Draft Data
-        draft_res = supabase_client.table("qgen_drafts").select("*").eq("id", download_req.draft_id).execute()
-        if not draft_res.data:
-            raise HTTPException(status_code=404, detail="Draft not found")
-        draft = draft_res.data[0]
-
-        # 2. Fetch Sections
-        sections_res = supabase_client.table("qgen_draft_sections").select("*").eq("qgen_draft_id", download_req.draft_id).order("position_in_draft").execute()
-        sections = sections_res.data
-
-        # 3. Fetch Instructions
-        instructions_res = supabase_client.table("qgen_draft_instructions_drafts_maps").select("*").eq("qgen_draft_id", download_req.draft_id).order("created_at", desc=True).execute()
-        instructions = instructions_res.data
-
-        # 4. Fetch Questions
-        section_ids = [s["id"] for s in sections]
-        questions = []
-        if section_ids:
-            questions_res = supabase_client.table("gen_questions").select("*").eq("is_in_draft", True).in_("qgen_draft_section_id", section_ids).execute()
-            questions = questions_res.data
-
-        # 4.1 Fetch Question Images
-        question_ids = [q["id"] for q in questions]
-        images_map = {}
-        if question_ids:
-            images_res = supabase_client.table("gen_images").select("*").in_("gen_question_id", question_ids).order("position").execute()
-            for img in images_res.data:
-                q_id = img["gen_question_id"]
-                if q_id not in images_map:
-                    images_map[q_id] = []
-                images_map[q_id].append(img)
-
-        # 5. Get Logo URL if exists
-        logo_url = None
-        if draft.get("logo_url"):
-            try:
-                logo_res = supabase_client.storage.from_("draft_logo_bucket").create_signed_url(draft["logo_url"], 3600)
-                logo_url = logo_res.get("signedUrl")
-            except Exception as e:
-                logger.warning(f"Failed to get signed logo URL: {e}")
-
-    except Exception as e:
-        logger.exception("Database error during PDF generation prep")
-        raise HTTPException(status_code=500, detail="Internal Server Error") from e
+    # 1. Fetch Paper Data using shared utility
+    data = await fetch_paper_data(download_req.draft_id, supabase_client)
+    
+    draft = data["draft"]
+    sections = data["sections"]
+    questions = data["questions"]
+    instructions = data["instructions"]
+    logo_url = data["logo_url"]
+    images_map = data["images_map"]
 
     # 6. Generate HTML
     html_content = generate_paper_html(draft, sections, questions, instructions, logo_url, download_req.mode, images_map)
