@@ -26,6 +26,8 @@ def regenerate_question_with_prompt_prompt(
         return f"""
 You are given this question: {gen_question}
 
+A screenshot of the current question is attached for reference if you need to understand the visual layout or specific rendering details.
+
 The user has provided the following instructions for regenerating this question:
 {custom_prompt}
 
@@ -38,7 +40,7 @@ Common Latex Errors:
 
     # Default behavior: regenerate on similar concepts (same as regenerate_question)
     return f"""
-You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
+You are given this question {gen_question}. A screenshot of the current question is attached for reference. Using the same concepts in this question, generate a new question. Return the new question in the same format.
 Common Latex Errors:
     {COMMON_INSTRUCTIONS}
 """
