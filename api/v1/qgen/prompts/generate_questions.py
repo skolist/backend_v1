@@ -1,12 +1,11 @@
 """
-Prompt template for generating questions.
+Prompt template for generating questions with granular concept association.
 """
 
 from typing import List, Dict, Optional
-
 from .common_instructions import COMMON_INSTRUCTIONS
 
-def generate_questions_prompt(
+def generate_questions_with_concepts_prompt(
     concepts: List[str],
     concepts_descriptions: Dict[str, str],
     old_questions_on_concepts: list,
@@ -17,18 +16,7 @@ def generate_questions_prompt(
 ) -> str:
     """
     Generate prompt for creating questions for a batch of concepts.
-
-    Args:
-        concepts: List of concept names to generate questions for
-        concepts_descriptions: Mapping of concept name to description
-        old_questions_on_concepts: Historical questions for reference
-        n: Number of questions to generate
-        question_type: Type of question (mcq4, short_answer, etc.)
-        difficulty: Difficulty level (easy, medium, hard)
-        instructions: Optional custom instructions from user
-
-    Returns:
-        Formatted prompt string for Gemini
+    Instructs Gemini to associate specific concepts with each question.
     """
     # Build concept information
     concept_info = []
@@ -39,13 +27,14 @@ def generate_questions_prompt(
     concepts_text = "\n".join(concept_info)
 
     instructions_block = (
-        f"\nAdditional user instructions (prioritize these over anything concepts selected or difficulty or marks or anything): {instructions}"
+        f"IMPORTANT CUSTOM INSTRUCTIONS:\n{instructions}\n(PRIORITIZE THESE ABOVE EVERYTHING ELSE)\n"
         if instructions
         else ""
     )
 
-    # Using f-string to avoid issues with curly braces in LaTeX examples
     return f"""
+    {instructions_block}
+
     You have access to these concepts and their descriptions:
     {concepts_text}
     
@@ -54,15 +43,15 @@ def generate_questions_prompt(
     Generate {n} questions of type {question_type} with difficulty level: {difficulty}
     
     Instructions:
-    - Choose concepts from the provided list above that are most relevant for each question
+    - For EACH question, identify which specific concepts from the provided list are directly relevant and include them in the 'concepts' field as a list of concept names.
+    - Each question MUST be associated with at least one concept from the provided list.
     - The questions should align with the specified difficulty level: {difficulty}
     - Use patterns from historical questions as reference but create original questions
-    - Be strictly within the knowledge of the provided concepts, no external knowledge
+    - Be strictly within the knowledge of the provided concepts, unless custom instructions above contradict this.
     - Strictly use LaTeX format for mathematical entities like symbols and formulas
     - Strictly output all required fields for the question schema. Answer Text is mandatory, use LaTeX where needed
-    - Question should  be Strictly Accurate and High Quality
+    - Question should be Strictly Accurate and High Quality
 
     Common Latex Errors are:
         {COMMON_INSTRUCTIONS}
-    {instructions_block}
     """
