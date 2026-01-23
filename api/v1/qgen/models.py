@@ -208,3 +208,9 @@ class FeedbackList(BaseModel):
     feedbacks: List[FeedbackItem] = Field(
         ..., description="List of feedback items with message and priority"
     )
+
+
+class AutoCorrectedQuestion(BaseModel):
+    """Wrapper for auto-corrected question from Gemini."""
+
+    question: AllQuestions = Field(..., description="The auto-corrected question")

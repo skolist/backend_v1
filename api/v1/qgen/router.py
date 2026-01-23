@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, status
 
 from .question_generator import generate_questions
-from .auto_correct_question import auto_correct_question
+from .auto_correct.routes import auto_correct_question
 from .regenerate_question import regenerate_question
 from .regenerate_question_with_prompt import regenerate_question_with_prompt
 from .get_feedback import get_feedback
