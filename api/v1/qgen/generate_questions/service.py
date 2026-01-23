@@ -20,7 +20,7 @@ from ..models import (
     QUESTION_TYPE_TO_ENUM,
 )
 from .models import QUESTION_TYPE_TO_SCHEMA_WITH_CONCEPTS
-from ..prompts.generate_questions import generate_questions_with_concepts_prompt
+from ..prompts import generate_questions_with_concepts_prompt
 
 logger = logging.getLogger(__name__)
 
