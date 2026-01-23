@@ -12,6 +12,8 @@ from .auto_correct_question import auto_correct_question
 from .regenerate_question import regenerate_question
 from .regenerate_question_with_prompt import regenerate_question_with_prompt
 from .get_feedback import get_feedback
+from .download_pdf import download_pdf
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,3 +30,5 @@ router.post("/regenerate_question_with_prompt", status_code=status.HTTP_200_OK)(
     regenerate_question_with_prompt
 )
 router.post("/get_feedback", status_code=status.HTTP_200_OK)(get_feedback)
+router.post("/download_pdf", status_code=status.HTTP_200_OK)(download_pdf)
+
