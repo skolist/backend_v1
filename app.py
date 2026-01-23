@@ -22,7 +22,10 @@ async def lifespan(app: FastAPI):
     # Launch browser once when server starts
     logger.info("Starting up: Launching browser...")
     playwright = await async_playwright().start()
-    browser = await playwright.chromium.launch(headless=True)
+    browser = await playwright.chromium.launch(
+        headless=True,
+        args=["--no-sandbox", "--disable-setuid-sandbox"]
+    )
     
     # Store in app state
     app.state.playwright = playwright

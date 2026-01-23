@@ -1,5 +1,5 @@
-# Use official Python runtime as base image
-FROM python:3.11-slim
+# This image already has Python, Chromium, and all Linux deps
+FROM mcr.microsoft.com/playwright/python:v1.57.0-noble
 
 # Set working directory in container
 WORKDIR /app

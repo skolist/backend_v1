@@ -1,0 +1,12 @@
+# Ignore the virtual environment
+venv/
+.venv/
+
+# Ignore Python cache
+**/__pycache__/
+*.pyc
+
+# Ignore large git history and logs
+.git/
+*.log
+logs/
