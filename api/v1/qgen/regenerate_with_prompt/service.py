@@ -126,14 +126,14 @@ class RegenerateWithPromptService:
         gen_question_data: dict,
         gen_question_id: str,
         supabase_client: supabase.Client,
-        browser,
+        browser_service,
         gemini_client: genai.Client,
         custom_prompt: Optional[str] = None,
         files: List[UploadFile] = [],
     ):
         # 1. Generate Screenshot
         logger.info(f"Generating screenshot for question {gen_question_id}")
-        image_bytes = await generate_screenshot(gen_question_data, browser)
+        image_bytes = await generate_screenshot(gen_question_data, browser_service)
         await save_image_for_debug(image_bytes, gen_question_id, "image/png")
         
         # Create image part

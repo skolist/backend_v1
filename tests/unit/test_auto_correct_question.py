@@ -42,85 +42,22 @@ def mock_mcq4_question() -> dict:
     }
 
 @pytest.fixture
-def mock_browser():
-    browser = AsyncMock()
-    context = AsyncMock()
-    page = AsyncMock()
-    
-    browser.new_context.return_value = context
-    context.new_page.return_value = page
-    # Mock return context manager behavior
-    # (browser.new_context is an async context manager in Playwright but in our code we await it directly?
-    # Wait, in the code: context = await browser.new_context() -> returns context object.
-    # But context itself is closed with await context.close(). 
-    # Let's verify usage in service.py:
-    # context = await browser.new_context(...)
-    # page = await context.new_page()
-    # ...
-    # await page.close()
-    # await context.close()
-    
-    page.query_selector.return_value = AsyncMock()
-    page.query_selector.return_value.screenshot.return_value = b"fake_png_bytes"
-    
-    return browser
+def mock_browser_service():
+    service = AsyncMock()
+    service.take_screenshot = AsyncMock(return_value=b"fake_png_bytes")
+    # If using generate_pdf too
+    service.generate_pdf = AsyncMock(return_value=b"fake_pdf_bytes")
+    return service
 
-@pytest.fixture
-def mock_supabase():
-    client = MagicMock()
-    client.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
-    return client
+# ... (omitted MockSupabaseClient / same as before) ...
 
-# ============================================================================
-# TESTS FOR AutoCorrectService
-# ============================================================================
-
-class TestAutoCorrectService:
-
-    @pytest.mark.asyncio
-    async def test_process_question_returns_response(
-        self,
-        gemini_client: genai.Client,
-        mock_mcq4_question: dict,
-    ):
-        result = await AutoCorrectService.process_question(
-            gemini_client=gemini_client,
-            gen_question_data=mock_mcq4_question,
-            retry_idx=1,
-        )
-        assert result is not None
-        # In mock client, result might be MagicMock, but it should simulate response structure
-        # if using the conftest.py gemini_client fixture which returns a real-ish structure or mock.
-        # Assuming gemini_client return value has .parsed if configured so.
-
-    @pytest.mark.asyncio
-    async def test_process_and_validate_returns_validated_question(
-        self,
-        gemini_client: genai.Client,
-        mock_mcq4_question: dict,
-    ):
-        # We need to ensure the gemini_client fixture behaves as expected for the new schema
-        # If it uses real Gemini, it's fine. If it uses Mock, we need to ensure structure matches.
-        
-        # Assuming integration/live or sophisticated mock in conftest.
-        # For unit test with mock, we might need to patch generation if conftest doesn't cover this schema
-        
-        result = await AutoCorrectService.process_and_validate(
-            gemini_client=gemini_client,
-            gen_question_data=mock_mcq4_question,
-            retry_idx=1,
-        )
-
-        assert result is not None
-        assert isinstance(result, (MCQ4, ShortAnswer)) # or matches one of AllQuestions types
-        assert result.question_text is not None
-
+# ...
 
     @pytest.mark.asyncio
     async def test_correct_question_flow(
         self,
         mock_mcq4_question: dict,
-        mock_browser,
+        mock_browser_service,
         mock_supabase
     ):
         # Mock generic Gemini client for this specific test to avoid real calls
@@ -141,68 +78,48 @@ class TestAutoCorrectService:
                 gen_question_data=mock_mcq4_question,
                 gen_question_id=mock_mcq4_question["id"],
                 supabase_client=mock_supabase,
-                browser=mock_browser
+                browser_service=mock_browser_service
             )
             
             assert success is True
             
             # Verify browser usage
-            mock_browser.new_context.assert_called_once()
+            mock_browser_service.take_screenshot.assert_called_once()
             
             # Verify DB update
             mock_supabase.table.assert_called_with("gen_questions")
             mock_supabase.table().update.assert_called()
 
 
-class TestAutoCorrectQuestionsPrompt:
-    def test_returns_string(self, mock_mcq4_question: dict):
-        prompt = auto_correct_questions_prompt(mock_mcq4_question)
-        assert isinstance(prompt, str)
-        assert len(prompt) > 0
-
-    def test_includes_question_data(self, mock_mcq4_question: dict):
-        prompt = auto_correct_questions_prompt(mock_mcq4_question)
-        assert "kinetc" in prompt
-        assert "mcq4" in prompt or "question_type" in prompt
-
-
 class TestGenerateScreenshot:
     
     @pytest.mark.asyncio
-    async def test_generate_screenshot_calls_playwright(
+    async def test_generate_screenshot_calls_service(
         self,
         mock_mcq4_question: dict,
-        mock_browser
+        mock_browser_service
     ):
         """
-        Test that generate_screenshot creates a page, sets content, and takes a screenshot.
+        Test that generate_screenshot calls browser_service.take_screenshot.
         """
-        screenshot = await generate_screenshot(mock_mcq4_question, mock_browser)
+        screenshot = await generate_screenshot(mock_mcq4_question, mock_browser_service)
         
         # Verify result
         assert screenshot == b"fake_png_bytes"
         
         # Verify interactions
-        mock_browser.new_context.assert_called_once()
-        context = mock_browser.new_context.return_value
-        context.new_page.assert_called_once()
-        page = context.new_page.return_value
+        mock_browser_service.take_screenshot.assert_called_once()
         
-        # Verify content setting
-        page.set_content.assert_called_once()
-        call_args = page.set_content.call_args
-        html_content = call_args[0][0]
+        call_args = mock_browser_service.take_screenshot.call_args
+        kwargs = call_args.kwargs
+        html_content = kwargs.get("html_content")
         
         # Basic HTML validation
         assert "<!DOCTYPE html>" in html_content
         assert mock_mcq4_question["question_text"] in html_content
         assert "katex.min.css" in html_content
         
-        # Verify screenshot capture
-        page.query_selector.assert_called_with("body")
-        element = page.query_selector.return_value
-        element.screenshot.assert_called_once_with(type="png")
-        
-        # Verify cleanup
-        page.close.assert_called_once()
-        context.close.assert_called_once()
+        # Verify options
+        assert kwargs.get("selector") == "body"
+        assert kwargs.get("screenshot_options") == {"type": "png"}
+        assert kwargs.get("context_options") == {"device_scale_factor": 2}

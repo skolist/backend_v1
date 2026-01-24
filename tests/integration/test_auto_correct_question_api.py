@@ -77,9 +77,10 @@ class TestAutoCorrectQuestionAuth:
         question_id = test_gen_question["id"]
 
         response = unauthenticated_test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
-
+    
         assert response.status_code == 401
 
     def test_returns_401_with_invalid_token(
@@ -98,7 +99,8 @@ class TestAutoCorrectQuestionAuth:
         question_id = test_gen_question["id"]
 
         response = client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 401
@@ -122,7 +124,8 @@ class TestAutoCorrectQuestionValidation:
         fake_question_id = "550e8400-e29b-41d4-a716-999999999999"
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={fake_question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": fake_question_id},
         )
 
         assert response.status_code == 404
@@ -140,7 +143,8 @@ class TestAutoCorrectQuestionValidation:
         question_id = test_gen_question["id"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         # Should return 200 (not 201) as it's an update operation
@@ -169,7 +173,8 @@ class TestAutoCorrectQuestionSuccess:
         original_text = test_gen_question["question_text"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 200
@@ -207,7 +212,8 @@ class TestAutoCorrectQuestionSuccess:
         original_type = test_gen_question["question_type"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 200
@@ -235,7 +241,8 @@ class TestAutoCorrectQuestionSuccess:
         question_id = test_gen_question["id"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 200
@@ -272,7 +279,8 @@ class TestAutoCorrectQuestionSuccess:
         original_activity_id = test_activity["id"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 200
@@ -302,7 +310,8 @@ class TestAutoCorrectQuestionSuccess:
         original_text = test_gen_question["question_text"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response.status_code == 200
@@ -385,7 +394,8 @@ class TestAutoCorrectQuestionEdgeCases:
         question_id = test_short_answer_question["id"]
 
         response = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         # May return 200 or 500 depending on model response
@@ -406,7 +416,8 @@ class TestAutoCorrectQuestionEdgeCases:
 
         # First correction
         response1 = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response1.status_code == 200
@@ -423,7 +434,8 @@ class TestAutoCorrectQuestionEdgeCases:
 
         # Second correction (should be idempotent or further improve)
         response2 = test_client.post(
-            f"/api/v1/qgen/auto_correct_question?gen_question_id={question_id}",
+            "/api/v1/qgen/auto_correct_question",
+            data={"gen_question_id": question_id},
         )
 
         assert response2.status_code == 200

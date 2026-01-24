@@ -22,6 +22,21 @@ from app import create_app
 from supabase_dir import PublicProductTypeEnumEnum
 from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
 
+# Mock BrowserService for integration tests
+class MockBrowserService:
+    def __init__(self):
+        self.browser = "mock_browser_instance"
+    
+    async def start(self):
+        pass
+        
+    async def stop(self):
+        pass
+        
+    async def take_screenshot(self, *args, **kwargs):
+        return b"fake_screenshot_bytes"
+
+
 
 # ============================================================================
 # MOCK RESPONSE FACTORIES (for integration tests)
@@ -212,13 +227,13 @@ def mock_gemini_client(use_live_gemini):
     else:
         # Patch genai.Client in all qgen modules
         with patch(
-            "api.v1.qgen.question_generator.genai.Client", MockGeminiClient
+            "api.v1.qgen.generate_questions.routes.genai.Client", MockGeminiClient
         ), patch(
-            "api.v1.qgen.auto_correct_question.genai.Client", MockGeminiClient
+            "api.v1.qgen.auto_correct.service.genai.Client", MockGeminiClient
         ), patch(
             "api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient
         ), patch(
-            "api.v1.qgen.regenerate_question_with_prompt.genai.Client", MockGeminiClient
+            "api.v1.qgen.regenerate_with_prompt.routes.genai.Client", MockGeminiClient
         ):
             yield
 
@@ -356,6 +371,16 @@ def auth_session(env: Dict[str, str]) -> Dict[str, Any]:
 # ============================================================================
 # FASTAPI TEST CLIENT FIXTURES
 # ============================================================================
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_browser_service_patch():
+    """
+    Mock BrowserService globally for the session to avoid real Playwright startup.
+    This must persist during lifespan execution.
+    """
+    with patch("services.browser_service.BrowserService", MockBrowserService):
+        yield
 
 
 @pytest.fixture(scope="session")

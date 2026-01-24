@@ -57,11 +57,11 @@ async def regenerate_question_with_prompt(
 
         gen_question_data = gen_question.data[0]
         
-        # Get browser
-        browser = getattr(request.app.state, "browser", None)
-        if not browser:
+        # Get browser service
+        browser_service = getattr(request.app.state, "browser_service", None)
+        if not browser_service:
              raise HTTPException(status_code=503, detail="Browser service unavailable")
-             
+        
         # Initialize Gemini Client
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -70,7 +70,7 @@ async def regenerate_question_with_prompt(
             gen_question_data=gen_question_data,
             gen_question_id=gen_question_id,
             supabase_client=supabase_client,
-            browser=browser,
+            browser_service=browser_service,
             gemini_client=gemini_client,
             custom_prompt=prompt,
             files=files

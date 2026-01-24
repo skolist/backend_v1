@@ -19,24 +19,21 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Launch browser once when server starts
-    logger.info("Starting up: Launching browser...")
-    playwright = await async_playwright().start()
-    browser = await playwright.chromium.launch(
-        headless=True,
-        args=["--no-sandbox", "--disable-setuid-sandbox"]
-    )
+    from services.browser_service import BrowserService
+    
+    # Initialize BrowserService
+    browser_service = BrowserService()
+    await browser_service.start()
     
     # Store in app state
-    app.state.playwright = playwright
-    app.state.browser = browser
+    app.state.browser_service = browser_service
+    # Keep app.state.browser for backward compatibility if needed, but optimally remove it
+    # We remove it to force errors where code hasn't been migrated
     
     yield
     
-    # Close browser on shutdown
-    logger.info("Shutting down: Closing browser...")
-    await browser.close()
-    await playwright.stop()
+    # Cleanup
+    await browser_service.stop()
 
 def create_app() -> FastAPI:
     """

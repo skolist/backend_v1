@@ -34,12 +34,12 @@ async def save_image_for_debug(
         logger.warning("Failed to save debug image", extra={"error": str(e)})
         return None
 
-async def generate_screenshot(question: Dict[str, Any], browser) -> bytes:
+async def generate_screenshot(question: Dict[str, Any], browser_service) -> bytes:
     """
-    Generate a screenshot of the question using Playwright.
+    Generate a screenshot of the question using Playwright via BrowserService.
     """
-    if not browser:
-        raise ScreenshotError("Browser instance not available")
+    if not browser_service:
+        raise ScreenshotError("Browser service instance not available")
 
     # CSS for the paper - Synchronized with PaperPreview.tsx
     css = """
@@ -144,7 +144,7 @@ async def generate_screenshot(question: Dict[str, Any], browser) -> bytes:
             if opt:
                 options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
         options_html += '</div>'
-
+        
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -169,18 +169,14 @@ async def generate_screenshot(question: Dict[str, Any], browser) -> bytes:
     </html>
     """
 
-    context = await browser.new_context(device_scale_factor=2)
-    page = await context.new_page()
-    
     try:
-        await page.set_content(html_content, wait_until="networkidle")
-        # Select the card element to screenshot
-        element = await page.query_selector("body") # or "#card"
-        screenshot_bytes = await element.screenshot(type="png")
+        screenshot_bytes = await browser_service.take_screenshot(
+            html_content=html_content,
+            selector="body",
+            screenshot_options={"type": "png"},
+            context_options={"device_scale_factor": 2}
+        )
         return screenshot_bytes
     except Exception as e:
         logger.error(f"Error taking screenshots: {e}")
         raise ScreenshotError(f"Failed to generate screenshot: {e}")
-    finally:
-        await page.close()
-        await context.close()

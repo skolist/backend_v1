@@ -55,9 +55,10 @@ class MockSupabaseClient:
 @pytest.fixture
 def test_app():
     # Only patch app start, not concerned with PDF browser here since we are testing DOCX
-    with patch("app.async_playwright") as mock_ap_app:
+    # But we must mock browser_service.async_playwright to prevent real launch
+    with patch("services.browser_service.async_playwright") as mock_ap_service:
         mock_p_instance = AsyncMock()
-        mock_ap_app.return_value.start = AsyncMock(return_value=mock_p_instance)
+        mock_ap_service.return_value.start = AsyncMock(return_value=mock_p_instance)
         mock_p_instance.chromium.launch = AsyncMock(return_value=AsyncMock())
         
         app = create_app()

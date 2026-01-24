@@ -40,29 +40,24 @@ async def download_pdf(
     # 6. Generate HTML
     html_content = generate_paper_html(draft, sections, questions, instructions, logo_url, download_req.mode, images_map)
 
-    # 7. Convert to PDF using Warm Browser Instance
+    # 7. Convert to PDF using Queue-based Browser Service
     try:
-        browser = getattr(request.app.state, "browser", None)
-        if not browser:
-            logger.error("Singleton browser instance not found in app state")
+        browser_service = getattr(request.app.state, "browser_service", None)
+        if not browser_service:
+            logger.error("Browser service instance not found in app state")
             raise HTTPException(
                 status_code=503, 
                 detail="PDF generation service is currently initializing or unavailable."
             )
 
-        context = await browser.new_context()
-        page = await context.new_page()
-        
-        # Set content and wait for network idle to ensure Katex/Images load
-        await page.set_content(html_content, wait_until="networkidle")
-        
-        pdf_bytes = await page.pdf(
-            format="A4",
-            print_background=True,
-            margin={"top": "20mm", "bottom": "20mm", "left": "20mm", "right": "20mm"}
+        pdf_bytes = await browser_service.generate_pdf(
+            html_content,
+            pdf_options={
+                "format": "A4",
+                "print_background": True,
+                "margin": {"top": "20mm", "bottom": "20mm", "left": "20mm", "right": "20mm"}
+            }
         )
-        await page.close()
-        await context.close()
 
         filename = f"{draft.get('paper_title', 'Paper')}_{download_req.mode}.pdf"
         return Response(
@@ -72,10 +67,9 @@ async def download_pdf(
         )
 
     except HTTPException:
-        # Re-raise HTTPExceptions (like our 503) so they aren't caught by the general Exception block
         raise
     except Exception as e:
-        logger.exception("Playwright PDF generation failed")
+        logger.exception("PDF generation failed")
         raise HTTPException(status_code=500, detail="Failed to generate PDF") from e
 
 def generate_paper_html(draft, sections, questions, instructions, logo_url, mode, images_map=None):

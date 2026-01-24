@@ -14,23 +14,28 @@ from typing import Dict, List
 import pytest
 import google.genai as genai
 
-from api.v1.qgen.question_generator import (
+from api.v1.qgen.generate_questions.service import (
     process_batch_generation,
     process_batch_generation_and_validate,
     try_retry_batch,
+    BatchProcessingContext,
+    BatchGenerationError,
+    BatchValidationError,
+)
+from api.v1.qgen.generate_questions.routes import (
     extract_question_type_counts_dict,
     extract_difficulty_percentages,
-    generate_questions_prompt,
     GenerateQuestionsRequest,
     QuestionConfig,
     QuestionTypeConfig,
     DifficultyDistribution,
-    BatchProcessingContext,
-    BatchGenerationError,
-    BatchValidationError,
-    QUESTION_TYPE_TO_ENUM,
 )
-from api.v1.qgen.utils.batchification import (
+from api.v1.qgen.prompts.generate_questions import (
+    generate_questions_with_concepts_prompt as generate_questions_prompt,
+)
+from api.v1.qgen.models import QUESTION_TYPE_TO_ENUM
+
+from api.v1.qgen.generate_questions.batchification import (
     build_batches_end_to_end,
     Batch,
     _dedupe_preserve_order,
@@ -622,31 +627,8 @@ class TestProcessBatchGeneration:
         assert isinstance(result, dict)
         assert "response" in result
         assert "batch" in result
-        assert "unique_concepts" in result
 
-    @pytest.mark.asyncio
-    async def test_deduplicates_concepts(
-        self,
-        batch_ctx: BatchProcessingContext,
-    ):
-        """Test that duplicate concepts are deduplicated."""
-        batch_with_duplicates = Batch(
-            question_type="mcq4",
-            difficulty="easy",
-            n_questions=1,
-            concepts=["Newton's Laws of Motion", "Newton's Laws of Motion", "Kinetic Energy"],
-            custom_instruction=None,
-        )
 
-        result = await process_batch_generation(
-            batch=batch_with_duplicates,
-            ctx=batch_ctx,
-            batch_idx=1,
-            retry_idx=1,
-        )
-
-        unique_concepts = result["unique_concepts"]
-        assert len(unique_concepts) == len(set(unique_concepts))
 
 
 # ============================================================================

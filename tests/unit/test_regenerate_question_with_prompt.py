@@ -116,24 +116,34 @@ class TestRegenerateWithPromptService:
         
         # Patch screenshot utils to avoid actual browser/file ops if needed, 
         # but since we pass mock_browser, generate_screenshot will use it.
-        # However, save_image_for_debug writes to file system, we should mock it or ensure it's safe (it uses known path).
-        # Better to mock save_image_for_debug
-        
-        with patch("api.v1.qgen.regenerate_with_prompt.service.save_image_for_debug", new=AsyncMock()) as mock_save:
+        with patch("api.v1.qgen.regenerate_with_prompt.service.save_image_for_debug", new=AsyncMock()) as mock_save, \
+             patch("api.v1.qgen.regenerate_with_prompt.service.RegenerateWithPromptService.process_and_validate") as mock_process, \
+             patch("api.v1.qgen.regenerate_with_prompt.service.generate_screenshot", new=AsyncMock(return_value=b"fake_image_bytes")) as mock_screenshot:
+            
+            # Setup mock return for process_and_validate
+            mock_mcq = MCQ4(**mock_mcq4_question)
+            mock_mcq.question_text = "Regenerated Text"
+            mock_process.return_value = mock_mcq
+
             success = await RegenerateWithPromptService.regenerate_question(
                 gen_question_data=mock_mcq4_question,
                 gen_question_id=mock_mcq4_question["id"],
                 supabase_client=mock_supabase,
-                browser=mock_browser,
+                browser_service=mock_browser,
                 gemini_client=mock_gemini,
                 custom_prompt="test prompt"
             )
             
             assert success is True
             
-            # Verify browser/screenshot called
-            mock_browser.new_context.assert_called()
+            # Verify browser/screenshot called - wait, if we mock generate_screenshot, mock_browser usage depends on implementation
+            # calling mock_screenshot means we don't necessarily call mock_browser inside it if passing mock.
+            # But the service passes browser to generate_screenshot.
+            mock_screenshot.assert_called_once()
             mock_save.assert_called()
             
+            # Verify process called
+            mock_process.assert_called()
+
             # Verify DB update
             mock_supabase.table.assert_called_with("gen_questions")
