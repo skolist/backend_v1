@@ -23,6 +23,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SMS_HOOK_SECRET = os.getenv("SMS_HOOK_SECRET")
+# MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY")
+# MSG91_TEMPLATE_ID = os.getenv("MSG91_TEMPLATE_ID")
+FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 PING = os.getenv("PING", "FALSE").upper()
@@ -55,6 +59,35 @@ if not OPENAI_API_KEY:
         "Environment variable not set",
         extra={"variable_name": "OPENAI_API_KEY"},
     )
+
+if not SMS_HOOK_SECRET:
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "SMS_HOOK_SECRET"},
+    )
+
+if not FIREBASE_CREDENTIALS:
+    logger.warning(
+        "Environment variable not set",
+        extra={"variable_name": "FIREBASE_CREDENTIALS"},
+    )
+# if not SMS_HOOK_SECRET:
+#     logger.warning(
+#         "Environment variable not set",
+#         extra={"variable_name": "SMS_HOOK_SECRET"},
+#     )
+
+# if not MSG91_AUTH_KEY:
+#     logger.warning(
+#         "Environment variable not set",
+#         extra={"variable_name": "MSG91_AUTH_KEY"},
+#     )
+# if not MSG91_TEMPLATE_ID:
+#     logger.warning(
+#         "Environment variable not set",
+#         extra={"variable_name": "MSG91_TEMPLATE_ID"},
+#     )
+
 if not DEPLOYMENT_ENV or DEPLOYMENT_ENV not in {"PRODUCTION", "STAGE", "LOCAL"}:
     logger.warning(
         "Invalid or missing DEPLOYMENT_ENV, defaulting to LOCAL",

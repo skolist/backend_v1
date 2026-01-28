@@ -13,3 +13,5 @@ python-multipart
 python-json-logger==4.0.0
 math2docx==2.0.3
 playwright==1.57.0
+firebase-admin==6.6.0
+standardwebhooks
