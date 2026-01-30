@@ -221,6 +221,9 @@ async def insert_batch_to_supabase(
         question_data = item["question"]
         concept_ids = item["concept_ids"]
 
+        # Extract SVGs before inserting question (svg is not a column in gen_questions)
+        svg_list = question_data.pop("svgs", None)
+
         gen_question_insert = GenQuestionsInsert(**question_data)
 
         result = (
@@ -233,6 +236,24 @@ async def insert_batch_to_supabase(
             inserted_question = result.data[0]
             question_id = inserted_question["id"]
             inserted_count += 1
+
+            # Insert SVGs into gen_images table if present
+            if svg_list:
+                for position, svg_item in enumerate(svg_list, start=1):
+                    try:
+                        # svg_item can be a dict with 'svg' key or an object with svg attribute
+                        svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
+                        if svg_string:
+                            gen_image = GenImagesInsert(
+                                gen_question_id=question_id,
+                                svg_string=svg_string,
+                                position=position,
+                            )
+                            supabase_client.table("gen_images").insert(
+                                gen_image.model_dump(mode="json", exclude_none=True)
+                            ).execute()
+                    except Exception as svg_error:
+                        logger.warning(f"Failed to insert SVG for question {question_id}: {svg_error}")
 
             for concept_id in concept_ids:
                 try:

@@ -1,29 +1,30 @@
+"""
+Regenerate question API routes.
+"""
+
 import logging
-from typing import Optional
 
 import supabase
-from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File, Form, Request
+from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
 
 from api.v1.auth import get_supabase_client, require_supabase_user
 from api.v1.qgen.credits import check_user_has_credits, deduct_user_credits
-from api.v1.qgen.models import AllQuestions, AutoCorrectedQuestion
-from api.v1.qgen.auto_correct.service import AutoCorrectService, QuestionProcessingError
+from api.v1.qgen.regenerate.service import RegenerateService, QuestionProcessingError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/auto_correct_question")
-async def auto_correct_question(
-    request: Request,
-    gen_question_id: str = Form(..., description="UUID of the question to correct"),
+
+@router.post("/regenerate_question")
+async def regenerate_question(
+    gen_question_id: str,
     supabase_client: supabase.Client = Depends(get_supabase_client),
     user: dict = Depends(require_supabase_user),
 ):
     """
-    API endpoint to auto-correct a question using backend-generated screenshot.
+    API endpoint to regenerate a new question on same concept.
     """
     user_id = user.id
     
@@ -32,7 +33,7 @@ async def auto_correct_question(
         return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
 
     logger.info(
-        "Received auto-correct request",
+        "Received regenerate request",
         extra={"gen_question_id": gen_question_id, "user_id": user_id},
     )
 
@@ -71,28 +72,29 @@ async def auto_correct_question(
                 "No SVGS were found for this question for regeneration",
                 extra={"gen_question_id": gen_question_id, "user_id": user_id},
             )
-        
-        # Get browser service from app state
-        browser_service = getattr(request.app.state, "browser_service", None)
-        if not browser_service:
-             raise HTTPException(status_code=503, detail="Browser service unavailable")
 
         # Process
-        await AutoCorrectService.correct_question(
+        await RegenerateService.regenerate_question(
             gen_question_data=gen_question_data,
             gen_question_id=gen_question_id,
             supabase_client=supabase_client,
-            browser_service=browser_service
         )
         
         # Deduct credits
         deduct_user_credits(user_id, 2)
         
+        logger.info(
+            "Regenerate completed successfully",
+            extra={"gen_question_id": gen_question_id},
+        )
+        
         return Response(status_code=status.HTTP_200_OK)
 
+    except HTTPException:
+        raise
     except QuestionProcessingError as e:
-        logger.exception("Error auto correcting question")
+        logger.exception("Error regenerating question")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e
     except Exception as e:
-        logger.exception("Unexpected error auto correcting question")
+        logger.exception("Unexpected error regenerating question")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e

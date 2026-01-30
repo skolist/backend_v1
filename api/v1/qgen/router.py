@@ -9,7 +9,7 @@ from fastapi import APIRouter, status
 
 from .generate_questions.routes import generate_questions
 from .auto_correct.routes import auto_correct_question
-from .regenerate_question import regenerate_question
+from .regenerate.routes import regenerate_question
 from .regenerate_with_prompt.routes import regenerate_question_with_prompt
 from .get_feedback import get_feedback
 from .download_pdf import download_pdf

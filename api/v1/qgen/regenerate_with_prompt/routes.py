@@ -57,6 +57,28 @@ async def regenerate_question_with_prompt(
 
         gen_question_data = gen_question.data[0]
         
+        # Fetch existing SVGs for this question
+        gen_images = (
+            supabase_client.table("gen_images")
+            .select("*")
+            .eq("gen_question_id", gen_question_id)
+            .order("position")
+            .execute()
+        )
+        
+        # Add SVGs to gen_question_data
+        if gen_images.data:
+            logger.debug(
+                "Received svgs for the question for regeneration",
+                extra={"gen_images": gen_images.data, "user_id": user_id},
+            )
+            gen_question_data["svgs"] = [{"svg": img["svg_string"]} for img in gen_images.data if img.get("svg_string")]
+        else:
+            logger.debug(
+                "No SVGS were found for this question for regeneration",
+                extra={"gen_question_id": gen_question_id, "user_id": user_id},
+            )
+        
         # Get browser service
         browser_service = getattr(request.app.state, "browser_service", None)
         if not browser_service:

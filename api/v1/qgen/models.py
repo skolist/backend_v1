@@ -32,7 +32,7 @@ class MCQ4(BaseModel):
     answer_text: Optional[str] = Field(
         default=None, description="Answer text if applicable"
     )
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -73,7 +73,7 @@ class MSQ4(BaseModel):
     answer_text: Optional[str] = Field(
         default=None, description="Answer text if applicable"
     )
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -98,7 +98,7 @@ class FillInTheBlank(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -123,7 +123,7 @@ class TrueFalse(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -145,7 +145,7 @@ class ShortAnswer(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -168,7 +168,7 @@ class LongAnswer(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svg: Optional[List[SVG]] = Field(
+    svgs: Optional[List[SVG]] = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
