@@ -15,14 +15,29 @@ router = APIRouter()
 # Ideally this should be done in a dedicated startup event or module
 try:
     if not firebase_admin._apps:
-        # Check if we have credentials in settings
         if settings.FIREBASE_CREDENTIALS:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
-            firebase_admin.initialize_app(cred)
+            import json
+            # Check if it's a JSON string or a file path
+            creds_data = settings.FIREBASE_CREDENTIALS.strip()
+            if creds_data.startswith('{'):
+                try:
+                    cred_dict = json.loads(creds_data)
+                    cred = credentials.Certificate(cred_dict)
+                    logger.info("Initializing Firebase Admin with JSON data from environment.")
+                except json.JSONDecodeError:
+                    logger.error("FIREBASE_CREDENTIALS looks like JSON but is invalid.")
+                    cred = None
+            else:
+                # Treat as file path
+                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
+                logger.info(f"Initializing Firebase Admin with certificate file: {settings.FIREBASE_CREDENTIALS}")
+            
+            if cred:
+                firebase_admin.initialize_app(cred)
         else:
             logger.warning("FIREBASE_CREDENTIALS not set. Firebase Admin not initialized.")
 except Exception as e:
-    logger.error(f"Failed to initialize Firebase Admin: {e}")
+    logger.error(f"Failed to initialize Firebase Admin: {e}", exc_info=True)
 
 class ExchangeRequest(BaseModel):
     firebase_token: str
