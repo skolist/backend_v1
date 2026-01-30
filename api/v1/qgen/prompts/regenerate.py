@@ -3,6 +3,7 @@ Prompt template for regenerating questions.
 """
 
 from .common_instructions import COMMON_INSTRUCTIONS
+from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
 def regenerate_question_prompt(gen_question: dict) -> str:
     """
@@ -20,4 +21,8 @@ def regenerate_question_prompt(gen_question: dict) -> str:
     
     Common Latex Errors are:
         {COMMON_INSTRUCTIONS}
+
+    If Diagram is/are required for the questions, then generate it following the below SVG Instructions.
+    Svg Instructions are:
+        {COMMON_SVG_INSTRUCTIONS}
     """

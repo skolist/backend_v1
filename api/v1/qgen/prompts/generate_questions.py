@@ -4,6 +4,7 @@ Prompt template for generating questions with granular concept association.
 
 from typing import List, Dict, Optional
 from .common_instructions import COMMON_INSTRUCTIONS
+from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
 def generate_questions_with_concepts_prompt(
     concepts: List[str],
@@ -54,4 +55,8 @@ def generate_questions_with_concepts_prompt(
 
     Common Latex Errors are:
         {COMMON_INSTRUCTIONS}
+
+    If Diagram is/are required for the questions, then generate it following the below SVG Instructions.
+    Svg Instructions are:
+        {COMMON_SVG_INSTRUCTIONS}
     """

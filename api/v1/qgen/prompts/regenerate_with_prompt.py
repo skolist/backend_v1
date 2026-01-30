@@ -5,6 +5,7 @@ Prompt template for regenerating questions with custom prompt.
 from typing import Optional
 
 from .common_instructions import COMMON_INSTRUCTIONS
+from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
 def regenerate_question_with_prompt_prompt(
     gen_question: dict,
@@ -36,6 +37,10 @@ If files are attached, use the content from those files to inform your regenerat
 Return the regenerated question in the same format as the original.
 Common Latex Errors:
     {COMMON_INSTRUCTIONS}
+
+If Diagram is/are required for the questions, then generate it following the below SVG Instructions.
+Svg Instructions are:
+    {COMMON_SVG_INSTRUCTIONS}
 """
 
     # Default behavior: regenerate on similar concepts (same as regenerate_question)
@@ -43,4 +48,8 @@ Common Latex Errors:
 You are given this question {gen_question}. A screenshot of the current question is attached for reference. Using the same concepts in this question, generate a new question. Return the new question in the same format.
 Common Latex Errors:
     {COMMON_INSTRUCTIONS}
+
+If Diagram is/are required for the questions, then generate it following the below SVG Instructions.
+Svg Instructions are:
+    {COMMON_SVG_INSTRUCTIONS}
 """
