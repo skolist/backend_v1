@@ -8,17 +8,19 @@ from pydantic import BaseModel, Field
 
 from supabase_dir import PublicQuestionTypeEnumEnum
 
+class SVG(BaseModel):
+    svg: str = Field(description="SVG relavant to the question if needed")
 
 class MCQ4(BaseModel):
     """MCQ4 question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    option1: Optional[str] = Field(default=None, description="First option")
-    option2: Optional[str] = Field(default=None, description="Second option")
-    option3: Optional[str] = Field(default=None, description="Third option")
-    option4: Optional[str] = Field(default=None, description="Fourth option")
-    correct_mcq_option: Optional[int] = Field(
-        default=None, description="Correct option (1-4)"
+    question_text: str = Field(description="The question text")
+    option1: str = Field(description="First option")
+    option2: str = Field(description="Second option")
+    option3: str = Field(description="Third option")
+    option4: str = Field(description="Fourth option")
+    correct_mcq_option: int = Field(
+        description="Correct option (1-4)"
     )
     explanation: Optional[str] = Field(
         default=None, description="Explanation for the answer"
@@ -29,6 +31,9 @@ class MCQ4(BaseModel):
     marks: Optional[int] = Field(default=None, description="Marks for this question")
     answer_text: Optional[str] = Field(
         default=None, description="Answer text if applicable"
+    )
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
     )
 
 
@@ -68,6 +73,9 @@ class MSQ4(BaseModel):
     answer_text: Optional[str] = Field(
         default=None, description="Answer text if applicable"
     )
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
 
 
 class MSQ4List(BaseModel):
@@ -90,6 +98,9 @@ class FillInTheBlank(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
 
 
 class FillInTheBlankList(BaseModel):
@@ -112,7 +123,9 @@ class TrueFalse(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
-
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
 
 class TrueFalseList(BaseModel):
     """List of TrueFalse questions."""
@@ -132,6 +145,9 @@ class ShortAnswer(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
 
 
 class ShortAnswerList(BaseModel):
@@ -152,6 +168,9 @@ class LongAnswer(BaseModel):
         default=None, description="Difficulty: easy, medium, hard"
     )
     marks: Optional[int] = Field(default=None, description="Marks for this question")
+    svg: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
 
 
 class LongAnswerList(BaseModel):

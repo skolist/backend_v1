@@ -13,6 +13,7 @@ from supabase_dir import (
     PublicHardnessLevelEnumEnum,
     GenQuestionsInsert,
     GenQuestionsConceptsMapsInsert,
+    GenImagesInsert,
 )
 
 from .batchification import build_batches_end_to_end, Batch
