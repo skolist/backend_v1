@@ -233,3 +233,54 @@ class AutoCorrectedQuestion(BaseModel):
     """Wrapper for auto-corrected question from Gemini."""
 
     question: AllQuestions = Field(..., description="The auto-corrected question")
+
+
+class ExtractedQuestion(BaseModel):
+    """Single extracted question with type discriminator for mixed-type extraction."""
+
+    question_type: str = Field(
+        description="Question type: mcq4, msq4, fill_in_the_blank, true_false, short_answer, long_answer"
+    )
+    question_text: str = Field(description="The question text")
+    # MCQ4/MSQ4 options
+    option1: Optional[str] = Field(default=None, description="First option (for MCQ/MSQ)")
+    option2: Optional[str] = Field(default=None, description="Second option (for MCQ/MSQ)")
+    option3: Optional[str] = Field(default=None, description="Third option (for MCQ/MSQ)")
+    option4: Optional[str] = Field(default=None, description="Fourth option (for MCQ/MSQ)")
+    # MCQ4 answer
+    correct_mcq_option: Optional[int] = Field(
+        default=None, description="Correct option (1-4) for MCQ4"
+    )
+    # MSQ4 answers
+    msq_option1_answer: Optional[bool] = Field(
+        default=None, description="Is option 1 correct (for MSQ4)"
+    )
+    msq_option2_answer: Optional[bool] = Field(
+        default=None, description="Is option 2 correct (for MSQ4)"
+    )
+    msq_option3_answer: Optional[bool] = Field(
+        default=None, description="Is option 3 correct (for MSQ4)"
+    )
+    msq_option4_answer: Optional[bool] = Field(
+        default=None, description="Is option 4 correct (for MSQ4)"
+    )
+    # Common fields
+    answer_text: Optional[str] = Field(
+        default=None, description="Answer text (for fill_in_blank, true_false, short_answer, long_answer)"
+    )
+    explanation: Optional[str] = Field(default=None, description="Explanation for the answer")
+    hardness_level: Optional[str] = Field(
+        default=None, description="Difficulty: easy, medium, hard"
+    )
+    marks: Optional[int] = Field(default=None, description="Marks for this question")
+    svgs: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relevant to the question if needed"
+    )
+
+
+class ExtractedQuestionsList(BaseModel):
+    """List of extracted questions of various types."""
+
+    questions: List[ExtractedQuestion] = Field(
+        description="List of extracted questions from the file"
+    )
