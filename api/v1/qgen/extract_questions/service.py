@@ -235,6 +235,21 @@ class ExtractQuestionsService:
                 # Handle answer_text - required field, provide default if missing
                 answer_text_value = question_data.pop("answer_text", "") or ""
                 
+                # Handle match the following columns
+                match_the_following_columns = None
+                if "columns" in question_data:
+                    cols = question_data.pop("columns")
+                    if isinstance(cols, list):
+                        dict_cols = {}
+                        for col in cols:
+                            if isinstance(col, dict):
+                                dict_cols[col["name"]] = col["items"]
+                            else:
+                                dict_cols[getattr(col, 'name', '')] = getattr(col, 'items', [])
+                        match_the_following_columns = dict_cols
+                    else:
+                        match_the_following_columns = cols
+
                 # Create insert model
                 gen_question = GenQuestionsInsert(
                     **question_data,
@@ -246,6 +261,7 @@ class ExtractQuestionsService:
                     is_in_draft=True,
                     marks=marks_value,
                     answer_text=answer_text_value,
+                    match_the_following_columns=match_the_following_columns,
                 )
                 
                 # Insert question

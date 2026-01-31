@@ -144,6 +144,25 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
             if opt:
                 options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
         options_html += '</div>'
+    elif question.get("question_type") == "match_the_following":
+        cols = question.get("match_the_following_columns") or {}
+        col_names = list(cols.keys())
+        if len(col_names) >= 2:
+            left_col = cols[col_names[0]]
+            right_col = cols[col_names[1]]
+            max_rows = max(len(left_col), len(right_col))
+            
+            options_html = '<table class="match-table">'
+            options_html += f'<tr><th style="text-align:left">{col_names[0]}</th><th style="text-align:left">{col_names[1]}</th></tr>'
+            for i in range(max_rows):
+                left_item = left_col[i] if i < len(left_col) else ""
+                right_item = right_col[i] if i < len(right_col) else ""
+                
+                options_html += '<tr>'
+                options_html += f'<td><div class="match-item"><span class="match-prefix">{i+1}.</span> {left_item}</div></td>'
+                options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65+i)}.</span> {right_item}</div></td>'
+                options_html += '</tr>'
+            options_html += '</table>'
         
     html_content = f"""
     <!DOCTYPE html>

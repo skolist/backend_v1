@@ -170,6 +170,8 @@ async def get_feedback(
             # Add MCQ options if present
             if question.get('question_type') == 'mcq4' and question.get('option1'):
                 q_detail += f"\n- Options: {question.get('option1', '')[:50]}, {question.get('option2', '')[:50]}, {question.get('option3', '')[:50]}, {question.get('option4', '')[:50]}"
+            elif question.get('question_type') == 'match_the_following' and question.get('match_the_following_columns'):
+                q_detail += f"\n- Columns: {str(question.get('match_the_following_columns'))[:200]}"
             
             questions_details.append(q_detail)
         

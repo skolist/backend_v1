@@ -6,6 +6,8 @@ from pydantic import UUID4
 from pydantic.types import StringConstraints
 from typing import Annotated
 from typing import Any
+from typing import Any
+from pydantic import Json
 import datetime
 
 
@@ -23,6 +25,7 @@ class PublicQuestionTypeEnumEnum(str, Enum):
 	TRUE_OR_FALSE = "true_or_false"
 	FILL_IN_THE_BLANKS = "fill_in_the_blanks"
 	LONG_ANSWER = "long_answer"
+	MATCH_THE_FOLLOWING = "match_the_following"
 
 class PublicHardnessLevelEnumEnum(str, Enum):
 	EASY = "easy"
@@ -236,6 +239,7 @@ class GenQuestionsBaseSchema(CustomModel):
 	is_in_draft: bool
 	is_page_break_below: bool = Field(description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
 	marks: int
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option2_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option3_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
@@ -715,6 +719,7 @@ class GenQuestionsInsert(CustomModelInsert):
 	# explanation: nullable
 	# is_in_draft: has default value
 	# is_page_break_below: has default value
+	# match_the_following_columns: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
 	# msq_option3_answer: nullable
@@ -741,6 +746,7 @@ class GenQuestionsInsert(CustomModelInsert):
 	explanation: str | None = Field(default=None, description="explanation for the question and answer")
 	is_in_draft: bool | None = Field(default=None)
 	is_page_break_below: bool | None = Field(default=None, description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option2_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option3_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
@@ -1318,6 +1324,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
 	# explanation: nullable
 	# is_in_draft: has default value
 	# is_page_break_below: has default value
+	# match_the_following_columns: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
 	# msq_option3_answer: nullable
@@ -1341,6 +1348,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
 	is_in_draft: bool | None = Field(default=None)
 	is_page_break_below: bool | None = Field(default=None, description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
 	marks: int | None = Field(default=None)
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option2_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")
 	msq_option3_answer: bool | None = Field(default=None, description="Describes if the option is correct or incorrect")

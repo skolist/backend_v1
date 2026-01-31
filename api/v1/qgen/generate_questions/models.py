@@ -5,7 +5,7 @@ New Pydantic models for question generation with granular concept association.
 from typing import List, Type, Dict
 from pydantic import Field, BaseModel
 from ..models import (
-    MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer,
+    MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer, MatchTheFollowing,
     QUESTION_TYPE_TO_ENUM
 )
 
@@ -45,6 +45,12 @@ class LongAnswerWithConcepts(LongAnswer):
 class LongAnswerWithConceptsList(BaseModel):
     questions: List[LongAnswerWithConcepts]
 
+class MatchTheFollowingWithConcepts(MatchTheFollowing):
+    concepts: List[str] = Field(..., description="List of concept names relevant to this specific question")
+
+class MatchTheFollowingWithConceptsList(BaseModel):
+    questions: List[MatchTheFollowingWithConcepts]
+
 QUESTION_TYPE_TO_SCHEMA_WITH_CONCEPTS: Dict[str, Type[BaseModel]] = {
     "mcq4": MCQ4WithConceptsList,
     "msq4": MSQ4WithConceptsList,
@@ -52,4 +58,5 @@ QUESTION_TYPE_TO_SCHEMA_WITH_CONCEPTS: Dict[str, Type[BaseModel]] = {
     "true_false": TrueFalseWithConceptsList,
     "short_answer": ShortAnswerWithConceptsList,
     "long_answer": LongAnswerWithConceptsList,
+    "match_the_following": MatchTheFollowingWithConceptsList,
 }

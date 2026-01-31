@@ -385,14 +385,34 @@ def render_question(q, display_idx, mode, images=None):
 
     # Options rendering
     options_html = ""
-    if is_mcq and mode == "paper":
-        options = [q.get("option1"), q.get("option2"), q.get("option3"), q.get("option4")]
-        options_html = '<div class="options-grid">'
-        labels = ["a)", "b)", "c)", "d)"]
-        for i, opt in enumerate(options):
-            if opt:
-                options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
-        options_html += '</div>'
+    if mode == "paper":
+        if is_mcq:
+            options = [q.get("option1"), q.get("option2"), q.get("option3"), q.get("option4")]
+            options_html = '<div class="options-grid">'
+            labels = ["a)", "b)", "c)", "d)"]
+            for i, opt in enumerate(options):
+                if opt:
+                    options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
+            options_html += '</div>'
+        elif q.get("question_type") == "match_the_following":
+            cols = q.get("match_the_following_columns") or {}
+            col_names = list(cols.keys())
+            if len(col_names) >= 2:
+                left_col = cols[col_names[0]]
+                right_col = cols[col_names[1]]
+                max_rows = max(len(left_col), len(right_col))
+                
+                options_html = '<table class="match-table">'
+                options_html += f'<tr><th style="text-align:left">{col_names[0]}</th><th style="text-align:left">{col_names[1]}</th></tr>'
+                for i in range(max_rows):
+                    left_item = left_col[i] if i < len(left_col) else ""
+                    right_item = right_col[i] if i < len(right_col) else ""
+                    
+                    options_html += '<tr>'
+                    options_html += f'<td><div class="match-item"><span class="match-prefix">{i+1}.</span> {left_item}</div></td>'
+                    options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65+i)}.</span> {right_item}</div></td>'
+                    options_html += '</tr>'
+                options_html += '</table>'
 
     # Answer rendering
     answer_html = ""

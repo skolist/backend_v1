@@ -223,6 +223,21 @@ async def insert_batch_to_supabase(
 
         # Extract SVGs before inserting question (svg is not a column in gen_questions)
         svg_list = question_data.pop("svgs", None)
+        
+        # Map columns to match_the_following_columns if present
+        if "columns" in question_data:
+            cols = question_data.pop("columns")
+            if isinstance(cols, list):
+                # Convert list of Column objects/dicts to a single dictionary
+                dict_cols = {}
+                for col in cols:
+                    if isinstance(col, dict):
+                        dict_cols[col["name"]] = col["items"]
+                    else:
+                        dict_cols[col.name] = col.items
+                question_data["match_the_following_columns"] = dict_cols
+            else:
+                question_data["match_the_following_columns"] = cols
 
         gen_question_insert = GenQuestionsInsert(**question_data)
 

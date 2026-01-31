@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class QuestionTypeConfig(BaseModel):
     """Question Type Configuration for the request."""
     type: Literal[
-        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4"
+        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4", "match_the_following"
     ]
     count: int
 

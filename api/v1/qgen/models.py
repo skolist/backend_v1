@@ -11,6 +11,10 @@ from supabase_dir import PublicQuestionTypeEnumEnum
 class SVG(BaseModel):
     svg: str = Field(description="SVG relavant to the question if needed")
 
+class Column(BaseModel):
+    name: str = Field(description="Column header, e.g., 'Column A' or 'List I'")
+    items: List[str] = Field(description="Items in the column")
+
 class MCQ4(BaseModel):
     """MCQ4 question schema for Gemini structured output."""
 
@@ -179,8 +183,28 @@ class LongAnswerList(BaseModel):
     questions: List[LongAnswer]
 
 
+class MatchTheFollowing(BaseModel):
+    "Match the following question schema for Gemini structured output."
+    question_text: Optional[str] = Field(default=None, description="The main question text, like Match The Following Things")
+    columns : List[Column] = Field(default = None, description= "List of columns for matching")
+    answer_text: Optional[str] = Field(default=None, description="The answer text")
+    explanation: Optional[str] = Field(
+        default=None, description="Explanation for the answer"
+    )
+    hardness_level: Optional[str] = Field(
+        default=None, description="Difficulty: easy, medium, hard"
+    )
+    marks: Optional[int] = Field(default=None, description="Marks for this question")
+    svgs: Optional[List[SVG]] = Field(
+        default=None, description="List of SVGs relavant to the question if needed"
+    )
+
+class MatchTheFollowingList(BaseModel):
+    """List of MatchTheFollowing questions."""
+    questions: List[MatchTheFollowing]
+
 # Type alias for any question type
-AllQuestions = Union[MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer]
+AllQuestions = Union[MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer, MatchTheFollowing]
 
 
 # Mapping from question type key to GenAI schema (list wrapper)
@@ -191,6 +215,7 @@ QUESTION_TYPE_TO_SCHEMA: Dict[str, Type[BaseModel]] = {
     "true_false": TrueFalseList,
     "short_answer": ShortAnswerList,
     "long_answer": LongAnswerList,
+    "match_the_following" : MatchTheFollowingList,
 }
 
 # Mapping from question type key to database enum value
@@ -201,6 +226,7 @@ QUESTION_TYPE_TO_ENUM: Dict[str, PublicQuestionTypeEnumEnum] = {
     "true_false": PublicQuestionTypeEnumEnum.TRUE_OR_FALSE,
     "short_answer": PublicQuestionTypeEnumEnum.SHORT_ANSWER,
     "long_answer": PublicQuestionTypeEnumEnum.LONG_ANSWER,
+    "match_the_following": PublicQuestionTypeEnumEnum.MATCH_THE_FOLLOWING,
 }
 
 QUESTION_TYPE_TO_FIELD = {
@@ -210,6 +236,7 @@ QUESTION_TYPE_TO_FIELD = {
     "true_false": "total_true_falses",
     "short_answer": "total_short_answers",
     "long_answer": "total_long_answers",
+    "match_the_following":"match_the_following_count",
 }
 
 
@@ -239,7 +266,7 @@ class ExtractedQuestion(BaseModel):
     """Single extracted question with type discriminator for mixed-type extraction."""
 
     question_type: str = Field(
-        description="Question type: mcq4, msq4, fill_in_the_blank, true_false, short_answer, long_answer"
+        description="Question type: mcq4, msq4, fill_in_the_blank, true_false, short_answer, long_answer, match_the_following"
     )
     question_text: str = Field(description="The question text")
     # MCQ4/MSQ4 options
@@ -264,6 +291,8 @@ class ExtractedQuestion(BaseModel):
     msq_option4_answer: Optional[bool] = Field(
         default=None, description="Is option 4 correct (for MSQ4)"
     )
+    # Match the following fields
+    columns : List[Column] = Field(default = None, description= "List of columns for matching")
     # Common fields
     answer_text: Optional[str] = Field(
         default=None, description="Answer text (for fill_in_blank, true_false, short_answer, long_answer)"

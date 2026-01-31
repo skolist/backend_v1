@@ -28,6 +28,7 @@ For each question, determine its type from one of these categories:
 - true_false: True or False statement
 - short_answer: Short answer question
 - long_answer: Long answer/essay question
+- match_the_following: Match the following question with two columns (Column A and Column B)
 
 For each question, extract:
 1. The complete question text (preserve any LaTeX/math notation) (Don't unnecessarily use double $$...$$, if inline is required use single $...$)

@@ -163,6 +163,20 @@ class RegenerateWithPromptService:
                 # Extract SVGs before updating gen_questions (svgs is not a column in gen_questions)
                 svg_list = update_data.pop("svgs", None)
                 
+                # Map 'columns' to 'match_the_following_columns' if it exists (for match_the_following type)
+                if "columns" in update_data:
+                    cols = update_data.pop("columns")
+                    if isinstance(cols, list):
+                        dict_cols = {}
+                        for col in cols:
+                            if isinstance(col, dict):
+                                dict_cols[col["name"]] = col["items"]
+                            else:
+                                dict_cols[getattr(col, 'name', '')] = getattr(col, 'items', [])
+                        update_data["match_the_following_columns"] = dict_cols
+                    else:
+                        update_data["match_the_following_columns"] = cols
+                
                 supabase_client.table("gen_questions").update(update_data).eq(
                     "id", gen_question_id
                 ).execute()

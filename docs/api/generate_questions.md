@@ -22,10 +22,10 @@ The user must be authenticated via Supabase Auth. Obtain the access token by sig
 
 ### Headers
 
-| Header          | Type   | Required | Description                    |
-|-----------------|--------|----------|--------------------------------|
+| Header          | Type   | Required | Description                      |
+| --------------- | ------ | -------- | -------------------------------- |
 | `Authorization` | string | Yes      | `Bearer <supabase_access_token>` |
-| `Content-Type`  | string | Yes      | `application/json`             |
+| `Content-Type`  | string | Yes      | `application/json`               |
 
 ### Body
 
@@ -48,29 +48,30 @@ The user must be authenticated via Supabase Auth. Obtain the access token by sig
 
 ### Body Parameters
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `activity_id` | UUID | Yes | The ID of the activity to associate generated questions with |
-| `concept_ids` | UUID[] | Yes | Array of concept IDs to generate questions from |
-| `config` | object | Yes | Configuration for question generation |
-| `config.question_types` | array | Yes | Array of question type configurations |
-| `config.question_types[].type` | string | Yes | One of: `mcq4`, `msq4`, `fill_in_the_blank`, `true_false`, `short_answer`, `long_answer` |
-| `config.question_types[].count` | integer | Yes | Number of questions to generate for this type |
-| `config.difficulty_distribution` | object | Yes | Percentage distribution of difficulty levels |
-| `config.difficulty_distribution.easy` | integer | Yes | Percentage of easy questions (0-100) |
-| `config.difficulty_distribution.medium` | integer | Yes | Percentage of medium questions (0-100) |
-| `config.difficulty_distribution.hard` | integer | Yes | Percentage of hard questions (0-100) |
+| Field                                   | Type    | Required | Description                                                                                                     |
+| --------------------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `activity_id`                           | UUID    | Yes      | The ID of the activity to associate generated questions with                                                    |
+| `concept_ids`                           | UUID[]  | Yes      | Array of concept IDs to generate questions from                                                                 |
+| `config`                                | object  | Yes      | Configuration for question generation                                                                           |
+| `config.question_types`                 | array   | Yes      | Array of question type configurations                                                                           |
+| `config.question_types[].type`          | string  | Yes      | One of: `mcq4`, `msq4`, `fill_in_the_blank`, `true_false`, `short_answer`, `long_answer`, `match_the_following` |
+| `config.question_types[].count`         | integer | Yes      | Number of questions to generate for this type                                                                   |
+| `config.difficulty_distribution`        | object  | Yes      | Percentage distribution of difficulty levels                                                                    |
+| `config.difficulty_distribution.easy`   | integer | Yes      | Percentage of easy questions (0-100)                                                                            |
+| `config.difficulty_distribution.medium` | integer | Yes      | Percentage of medium questions (0-100)                                                                          |
+| `config.difficulty_distribution.hard`   | integer | Yes      | Percentage of hard questions (0-100)                                                                            |
 
 ### Question Types
 
-| Type | Description |
-|------|-------------|
-| `mcq4` | Multiple Choice Question with 4 options, 1 correct answer |
-| `msq4` | Multiple Select Question with 4 options, multiple correct answers |
-| `fill_in_the_blank` | Fill in the blank question |
-| `true_false` | True/False question |
-| `short_answer` | Short answer question |
-| `long_answer` | Long answer/essay question |
+| Type                  | Description                                                       |
+| --------------------- | ----------------------------------------------------------------- |
+| `mcq4`                | Multiple Choice Question with 4 options, 1 correct answer         |
+| `msq4`                | Multiple Select Question with 4 options, multiple correct answers |
+| `fill_in_the_blank`   | Fill in the blank question                                        |
+| `true_false`          | True/False question                                               |
+| `short_answer`        | Short answer question                                             |
+| `long_answer`         | Long answer/essay question                                        |
+| `match_the_following` | Match the following question with two columns                     |
 
 ---
 
@@ -83,15 +84,16 @@ The user must be authenticated via Supabase Auth. Obtain the access token by sig
 **Body**: Empty (no content)
 
 The generated questions are stored in the database:
+
 - Questions are inserted into the `gen_questions` table
 - Concept-question mappings are inserted into the `gen_questions_concepts_maps` table
 
 ### Error Responses
 
-| Status Code | Description |
-|-------------|-------------|
-| `401 Unauthorized` | Missing or invalid authentication token |
-| `422 Unprocessable Entity` | Invalid request body (validation error) |
+| Status Code                 | Description                             |
+| --------------------------- | --------------------------------------- |
+| `401 Unauthorized`          | Missing or invalid authentication token |
+| `422 Unprocessable Entity`  | Invalid request body (validation error) |
 | `500 Internal Server Error` | Server error during question generation |
 
 #### 401 Unauthorized
@@ -159,23 +161,23 @@ curl -X POST "https://your-api-domain.com/api/v1/generate/questions" \
 ### JavaScript/TypeScript (fetch)
 
 ```typescript
-const response = await fetch('/api/v1/generate/questions', {
-  method: 'POST',
+const response = await fetch("/api/v1/generate/questions", {
+  method: "POST",
   headers: {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    activity_id: '550e8400-e29b-41d4-a716-446655440000',
+    activity_id: "550e8400-e29b-41d4-a716-446655440000",
     concept_ids: [
-      '660e8400-e29b-41d4-a716-446655440001',
-      '660e8400-e29b-41d4-a716-446655440002',
+      "660e8400-e29b-41d4-a716-446655440001",
+      "660e8400-e29b-41d4-a716-446655440002",
     ],
     config: {
       question_types: [
-        { type: 'mcq4', count: 5 },
-        { type: 'true_false', count: 3 },
-        { type: 'short_answer', count: 2 },
+        { type: "mcq4", count: 5 },
+        { type: "true_false", count: 3 },
+        { type: "short_answer", count: 2 },
       ],
       difficulty_distribution: {
         easy: 30,
@@ -187,7 +189,7 @@ const response = await fetch('/api/v1/generate/questions', {
 });
 
 if (response.status === 201) {
-  console.log('Questions generated successfully');
+  console.log("Questions generated successfully");
   // Fetch generated questions from gen_questions table
 }
 ```
@@ -195,30 +197,30 @@ if (response.status === 201) {
 ### JavaScript/TypeScript (Supabase + fetch)
 
 ```typescript
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Get current session
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 
 if (!session) {
-  throw new Error('User not authenticated');
+  throw new Error("User not authenticated");
 }
 
-const response = await fetch('/api/v1/generate/questions', {
-  method: 'POST',
+const response = await fetch("/api/v1/generate/questions", {
+  method: "POST",
   headers: {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json',
+    Authorization: `Bearer ${session.access_token}`,
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
     activity_id: activityId,
     concept_ids: selectedConceptIds,
     config: {
-      question_types: [
-        { type: 'mcq4', count: 5 },
-      ],
+      question_types: [{ type: "mcq4", count: 5 }],
       difficulty_distribution: {
         easy: 40,
         medium: 40,
@@ -235,13 +237,14 @@ const response = await fetch('/api/v1/generate/questions', {
 
 ```typescript
 // Request types
-type QuestionType = 
-  | 'mcq4' 
-  | 'msq4' 
-  | 'fill_in_the_blank' 
-  | 'true_false' 
-  | 'short_answer' 
-  | 'long_answer';
+type QuestionType =
+  | "mcq4"
+  | "msq4"
+  | "fill_in_the_blank"
+  | "true_false"
+  | "short_answer"
+  | "long_answer"
+  | "match_the_following";
 
 interface QuestionTypeConfig {
   type: QuestionType;
@@ -249,9 +252,9 @@ interface QuestionTypeConfig {
 }
 
 interface DifficultyDistribution {
-  easy: number;   // 0-100
+  easy: number; // 0-100
   medium: number; // 0-100
-  hard: number;   // 0-100
+  hard: number; // 0-100
 }
 
 interface QuestionConfig {
@@ -284,10 +287,10 @@ interface GenerateQuestionsRequest {
 
 ## Related Database Tables
 
-| Table | Description |
-|-------|-------------|
-| `gen_questions` | Stores generated questions |
-| `gen_questions_concepts_maps` | Maps generated questions to concepts |
-| `concepts` | Source concepts for question generation |
-| `activities` | Parent activity that owns the generated questions |
-| `bank_questions` | Historical questions used as reference |
+| Table                         | Description                                       |
+| ----------------------------- | ------------------------------------------------- |
+| `gen_questions`               | Stores generated questions                        |
+| `gen_questions_concepts_maps` | Maps generated questions to concepts              |
+| `concepts`                    | Source concepts for question generation           |
+| `activities`                  | Parent activity that owns the generated questions |
+| `bank_questions`              | Historical questions used as reference            |

@@ -243,18 +243,49 @@ async def download_docx(
                             pass
 
                 # Options (MCQ)
-                if q.get("question_type") in ["mcq4", "msq4"] and download_req.mode == "paper":
-                    opt_table = doc.add_table(rows=2, cols=2)
-                    set_table_no_border(opt_table)  # Hide borders
-                    opts = [q.get("option1"), q.get("option2"), q.get("option3"), q.get("option4")]
-                    labels = ["a) ", "b) ", "c) ", "d) "]
-                    for i, opt in enumerate(opts):
-                        row = i // 2
-                        col = i % 2
-                        if opt:
-                            cell_p = opt_table.rows[row].cells[col].paragraphs[0]
-                            cell_p.add_run(labels[i]).bold = True
-                            add_text_with_math(cell_p, str(opt), f"Q{idx + 1}-Opt{i + 1}")
+                if download_req.mode == "paper":
+                    if q.get("question_type") in ["mcq4", "msq4"]:
+                        opt_table = doc.add_table(rows=2, cols=2)
+                        set_table_no_border(opt_table)  # Hide borders
+                        opts = [q.get("option1"), q.get("option2"), q.get("option3"), q.get("option4")]
+                        labels = ["a) ", "b) ", "c) ", "d) "]
+                        for i, opt in enumerate(opts):
+                            row = i // 2
+                            col = i % 2
+                            if opt:
+                                cell_p = opt_table.rows[row].cells[col].paragraphs[0]
+                                cell_p.add_run(labels[i]).bold = True
+                                add_text_with_math(cell_p, str(opt), f"Q{idx + 1}-Opt{i + 1}")
+                    elif q.get("question_type") == "match_the_following":
+                        cols = q.get("match_the_following_columns") or {}
+                        col_names = list(cols.keys())
+                        if len(col_names) >= 2:
+                            left_col = cols[col_names[0]]
+                            right_col = cols[col_names[1]]
+                            max_rows = max(len(left_col), len(right_col))
+                            
+                            match_table = doc.add_table(rows=max_rows + 1, cols=2)
+                            set_table_no_border(match_table)
+                            
+                            # Headers
+                            for c_idx, name in enumerate(col_names[:2]):
+                                cell_p = match_table.rows[0].cells[c_idx].paragraphs[0]
+                                cell_p.add_run(name).bold = True
+                            
+                            # Items
+                            for r_idx in range(max_rows):
+                                left_item = left_col[r_idx] if r_idx < len(left_col) else ""
+                                right_item = right_col[r_idx] if r_idx < len(right_col) else ""
+                                
+                                # Left Col
+                                l_cell_p = match_table.rows[r_idx+1].cells[0].paragraphs[0]
+                                l_cell_p.add_run(f"{r_idx+1}. ").bold = True
+                                add_text_with_math(l_cell_p, str(left_item), f"Q{idx + 1}-L{r_idx}")
+                                
+                                # Right Col
+                                r_cell_p = match_table.rows[r_idx+1].cells[1].paragraphs[0]
+                                r_cell_p.add_run(f"{chr(65+r_idx)}. ").bold = True
+                                add_text_with_math(r_cell_p, str(right_item), f"Q{idx + 1}-R{r_idx}")
 
                 # Answer Key
                 if download_req.mode == "answer":
