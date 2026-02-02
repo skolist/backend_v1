@@ -21,6 +21,7 @@ async def regenerate_question_with_prompt(
     request: Request,
     gen_question_id: str = Form(..., description="UUID of the question to regenerate"),
     prompt: Optional[str] = Form(None, description="Custom prompt for regeneration"),
+    is_camera_capture: bool = Form(False, description="Flag indicating if this is from camera capture"),
     files: List[UploadFile] = File(default=[], description="Optional files to attach"),
     supabase_client: supabase.Client = Depends(get_supabase_client),
     user: dict = Depends(require_supabase_user),
@@ -38,6 +39,7 @@ async def regenerate_question_with_prompt(
         extra={
             "gen_question_id": gen_question_id,
             "has_custom_prompt": bool(prompt),
+            "is_camera_capture": is_camera_capture,
             "file_count": len(files),
             "user_id": user_id,
         },
@@ -95,7 +97,8 @@ async def regenerate_question_with_prompt(
             browser_service=browser_service,
             gemini_client=gemini_client,
             custom_prompt=prompt,
-            files=files
+            files=files,
+            is_camera_capture=is_camera_capture
         )
         
         deduct_user_credits(user_id, 2)

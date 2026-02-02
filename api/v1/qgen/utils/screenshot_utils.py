@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-LOG_IMAGES = os.getenv("LOG_IMAGES", "false").lower() == "true"
+from config.settings import LOG_IMAGES
 IMAGES_LOG_DIR = Path(__file__).parent.parent.parent.parent.parent / "logs" / "images"
 
 class ScreenshotError(Exception):

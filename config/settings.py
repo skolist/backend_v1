@@ -30,6 +30,7 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV")
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 PING = os.getenv("PING", "FALSE").upper()
+LOG_IMAGES = os.getenv("LOG_IMAGES", "false").lower() == "true"
 
 logger.info(
     "Configuration loaded",

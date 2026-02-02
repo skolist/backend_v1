@@ -25,7 +25,7 @@ def _log_prefix(retry_idx: int = None) -> str:
         return f"RETRY:{retry_idx} | "
     return ""
 
-async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
+async def process_uploaded_files(files: List[UploadFile], gen_question_id: str = None) -> List[types.Part]:
     """
     Process uploaded files and convert them to Gemini Part objects.
     """
@@ -34,6 +34,13 @@ async def process_uploaded_files(files: List[UploadFile]) -> List[types.Part]:
         if file.filename and file.size and file.size > 0:
             content = await file.read()
             content_type = file.content_type or "application/octet-stream"
+
+            # Log image files if logging is enabled
+            if content_type.startswith("image/") and gen_question_id:
+                try:
+                    await save_image_for_debug(content, gen_question_id, content_type)
+                except Exception as e:
+                    logger.warning(f"Failed to log uploaded image {file.filename}: {e}")
 
             if content_type.startswith("image/") or content_type == "application/pdf":
                 parts.append(types.Part.from_bytes(data=content, mime_type=content_type))
@@ -131,21 +138,30 @@ class RegenerateWithPromptService:
         gemini_client: genai.Client,
         custom_prompt: Optional[str] = None,
         files: List[UploadFile] = [],
+        is_camera_capture: bool = False,
     ):
-        # 1. Generate Screenshot
-        logger.info(f"Generating screenshot for question {gen_question_id}")
-        image_bytes = await generate_screenshot(gen_question_data, browser_service)
-        await save_image_for_debug(image_bytes, gen_question_id, "image/png")
+        all_parts = []
         
-        # Create image part
-        screenshot_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+        # 1. Generate Screenshot (ONLY if not a camera capture)
+        # If it IS a camera capture, we trust the user's photo as the primary source 
+        # and avoid distracting the model with the "old" question screenshot.
+        if not is_camera_capture:
+            logger.info(f"Generating screenshot for question {gen_question_id}")
+            try:
+                image_bytes = await generate_screenshot(gen_question_data, browser_service)
+                await save_image_for_debug(image_bytes, gen_question_id, "image/png")
+                
+                # Create image part
+                screenshot_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+                all_parts.append(screenshot_part)
+            except Exception as e:
+                logger.warning(f"Failed to generate screenshot: {e}")
+        else:
+             logger.info(f"Skipping screenshot generation for camera capture request: {gen_question_id}")
         
         # 2. Process Files
-        file_parts = await process_uploaded_files(files)
-        
-        # Combine parts: Screenshot is KEY context, so add it.
-        # The user asked to "add the screenshot of current question".
-        all_parts = [screenshot_part] + file_parts
+        file_parts = await process_uploaded_files(files, gen_question_id)
+        all_parts.extend(file_parts)
 
         # 3. Call Gemini with Retry
         max_retries = 5
