@@ -362,7 +362,7 @@ def render_section(section, all_questions, mode, images_map=None):
     <div class="section-container">
         <div class="section-header">
             <span class="section-name">{section.get('section_name')}</span>
-            <span class="section-marks">[{total_marks} marks]</span>
+            <span class="section-marks">[{total_marks}]</span>
         </div>
         {"".join(render_question(q, idx + 1, mode, images_map.get(q["id"], []) if images_map else []) for idx, q in enumerate(section_questions))}
     </div>
@@ -434,7 +434,7 @@ def render_question(q, display_idx, mode, images=None):
         <div class="q-content">
             <div class="q-row">
                 <div class="q-text">{q.get('question_text')}</div>
-                <div class="q-marks">[{q.get('marks')} marks]</div>
+                <div class="q-marks">[{q.get('marks')}]</div>
             </div>
             {images_html}
             {options_html}

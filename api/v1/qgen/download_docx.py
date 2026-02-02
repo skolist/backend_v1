@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import time
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import re
@@ -63,6 +63,36 @@ async def download_docx(
             border.set(qn('w:val'), 'nil')
             tbl_borders.append(border)
         tbl_pr.append(tbl_borders)
+
+    def add_horizontal_rule(paragraph):
+        """Adds a bottom border to the paragraph to create a horizontal line."""
+        p = paragraph._p
+        pPr = p.get_or_add_pPr()
+        pBdr = OxmlElement('w:pBdr')
+        
+        bottom = OxmlElement('w:bottom')
+        bottom.set(qn('w:val'), 'single')
+        bottom.set(qn('w:sz'), '6')  # 6 = 3/4 pt
+        bottom.set(qn('w:space'), '1')
+        bottom.set(qn('w:color'), 'auto')
+        pBdr.append(bottom)
+        
+        # Ensure pBdr is inserted before alignment (jc) or other spacing elements if they exist
+        # to respect some schema strictness, though mostly for jc. 
+        # Ideally pBdr is early in pPr.
+        # Find first element that should come AFTER pBdr? 
+        # Schema: pStyle, keepNext, keepLines, pageBreakBefore, framePr, widowControl, numPr, suppressLineNumbers, pBdr
+        # So we append, unless we see something that must be after.
+        # But simply appending usually works for 'jc' if 'jc' isn't set yet.
+        # If we set alignment later, python-docx handles it?
+        # Let's just insert at the beginning of pPr to be safe if no pStyle, 
+        # or after pStyle if it exists.
+        
+        if len(pPr) > 0 and pPr[0].tag == qn('w:pStyle'):
+            pPr.insert(1, pBdr)
+            return
+
+        pPr.insert(0, pBdr) # Insert as first element/early element safe bet for fresh para
 
     def remove_control_characters(text):
         """
@@ -193,7 +223,9 @@ async def download_docx(
         cells_r2[1].text = f"Duration: {format_duration(draft.get('paper_duration'))}"
         cells_r2[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-        doc.add_paragraph("_" * 80).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Horizontal Rule
+        hr_p = doc.add_paragraph()
+        add_horizontal_rule(hr_p)
 
         # Instructions
         if download_req.mode == "paper" and instructions:
@@ -201,6 +233,14 @@ async def download_docx(
             for inst in instructions:
                 p = doc.add_paragraph(style='List Number')
                 add_text_with_math(p, inst.get('instruction_text'))
+
+        # Calculate available width for right alignment
+        doc_section = doc.sections[0]
+        # Use safe defaults if margins are not set (though usually they are)
+        page_width = doc_section.page_width or Inches(8.5)
+        left_margin = doc_section.left_margin or Inches(1.0)
+        right_margin = doc_section.right_margin or Inches(1.0)
+        printable_width = page_width - left_margin - right_margin
 
         # Sections and Questions
         for section in sections:
@@ -214,20 +254,31 @@ async def download_docx(
             total_marks = sum(q.get("marks", 0) for q in section_questions)
             
             p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            run = p.add_run(f"{section.get('section_name')} [{total_marks} marks]")
+            p.paragraph_format.tab_stops.add_tab_stop(printable_width, WD_TAB_ALIGNMENT.RIGHT)
+            
+            run = p.add_run(f"{section.get('section_name')}")
             run.bold = True
             run.underline = True
             run.font.size = Pt(14)
+            
+            m_run = p.add_run(f"\t[{total_marks}]")
+            m_run.bold = True
+            m_run.font.size = Pt(14)
+            
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
             for idx, q in enumerate(section_questions):
                 q_p = doc.add_paragraph()
+                
+                # Add right-aligned tab stop
+                q_p.paragraph_format.tab_stops.add_tab_stop(printable_width, WD_TAB_ALIGNMENT.RIGHT)
+
                 q_p.add_run(f"{idx + 1}. ").bold = True
                 
                 # Question Text with Math
                 add_text_with_math(q_p, q.get('question_text', ''), f"Q{idx + 1}-Text")
                 
-                m_run = q_p.add_run(f" [{q.get('marks')} marks]")
+                m_run = q_p.add_run(f"\t[{q.get('marks')}]")
                 m_run.italic = True
                 q_p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
