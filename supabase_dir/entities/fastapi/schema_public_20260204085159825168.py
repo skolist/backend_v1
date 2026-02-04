@@ -85,10 +85,6 @@ class BankQuestionsBaseSchema(CustomModel):
 	explanation: str | None = Field(default=None)
 	figure: str | None = Field(default=None)
 	hardness_level: PublicHardnessLevelEnumEnum | None = Field(default=None)
-	is_from_exercise: bool = Field(description="1 if from exercise of the textbook, 0 otherwise")
-	is_image_needed: bool = Field(description="1 if image is to be inserted yet for the question, 0 otherwise")
-	is_incomplete: bool = Field(description="1 if any manual modifications are needed or any errors are there in the question, 0 otherwise")
-	is_solved_example: bool = Field(description="1 if it is solved example from the textbook, 0 otherwise")
 	marks: int | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
@@ -490,10 +486,6 @@ class BankQuestionsInsert(CustomModelInsert):
 	# explanation: nullable
 	# figure: nullable
 	# hardness_level: nullable
-	# is_from_exercise: has default value
-	# is_image_needed: has default value
-	# is_incomplete: has default value
-	# is_solved_example: has default value
 	# marks: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
@@ -518,10 +510,6 @@ class BankQuestionsInsert(CustomModelInsert):
 	explanation: str | None = Field(default=None)
 	figure: str | None = Field(default=None)
 	hardness_level: PublicHardnessLevelEnumEnum | None = Field(default=None)
-	is_from_exercise: bool | None = Field(default=None, description="1 if from exercise of the textbook, 0 otherwise")
-	is_image_needed: bool | None = Field(default=None, description="1 if image is to be inserted yet for the question, 0 otherwise")
-	is_incomplete: bool | None = Field(default=None, description="1 if any manual modifications are needed or any errors are there in the question, 0 otherwise")
-	is_solved_example: bool | None = Field(default=None, description="1 if it is solved example from the textbook, 0 otherwise")
 	marks: int | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
@@ -1115,10 +1103,6 @@ class BankQuestionsUpdate(CustomModelUpdate):
 	# explanation: nullable
 	# figure: nullable
 	# hardness_level: nullable
-	# is_from_exercise: has default value
-	# is_image_needed: has default value
-	# is_incomplete: has default value
-	# is_solved_example: has default value
 	# marks: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
@@ -1138,10 +1122,6 @@ class BankQuestionsUpdate(CustomModelUpdate):
 	explanation: str | None = Field(default=None)
 	figure: str | None = Field(default=None)
 	hardness_level: PublicHardnessLevelEnumEnum | None = Field(default=None)
-	is_from_exercise: bool | None = Field(default=None, description="1 if from exercise of the textbook, 0 otherwise")
-	is_image_needed: bool | None = Field(default=None, description="1 if image is to be inserted yet for the question, 0 otherwise")
-	is_incomplete: bool | None = Field(default=None, description="1 if any manual modifications are needed or any errors are there in the question, 0 otherwise")
-	is_solved_example: bool | None = Field(default=None, description="1 if it is solved example from the textbook, 0 otherwise")
 	marks: int | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
