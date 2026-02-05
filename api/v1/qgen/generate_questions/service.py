@@ -17,6 +17,7 @@ from supabase_dir import (
 )
 
 from .batchification import build_batches_end_to_end, Batch
+from .utils.fetch_questions import fetch_questions_from_bank, QuestionRequestType
 from ..models import (
     QUESTION_TYPE_TO_ENUM,
 )
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 class BatchProcessingContext:
     """Holds all contextual data needed for processing batches."""
     gemini_client: genai.Client
+    supabase_client: supabase.Client
     concepts_dict: Dict[str, str]  # concept_name -> description
     concepts_name_to_id: Dict[str, str]  # concept_name -> concept_id
     old_questions: List[dict]  # historical questions for reference
@@ -98,6 +100,30 @@ async def process_batch_generation_and_validate(
     batch_idx: int = None,
     retry_idx: int = None,
 ) -> List[Dict[str, any]]:
+    # Intercept for bank fetching types
+    if batch.question_type == "solved_examples":
+        res =  fetch_questions_from_bank(
+            ctx.supabase_client,
+            batch.concepts,
+            ctx.concepts_name_to_id,
+            batch.n_questions,
+            batch.difficulty,
+            QuestionRequestType.SOLVED_EXAMPLE
+        )
+        logger.info(f"Found Number of solved_examples fetched for insertion : {len(res)}")
+        return res
+    elif batch.question_type == "exercise_questions":
+        res = fetch_questions_from_bank(
+            ctx.supabase_client,
+            batch.concepts,
+            ctx.concepts_name_to_id,
+            batch.n_questions,
+            batch.difficulty,
+            QuestionRequestType.EXERCISE_QUESTION
+        )
+        logger.info(f"Found Number of exercise_questions fetched for insertion : {len(res)}")
+        return res
+
     generation_result = await process_batch_generation(batch, ctx, batch_idx, retry_idx)
     response = generation_result["response"]
 
@@ -216,10 +242,18 @@ async def insert_batch_to_supabase(
 ) -> int:
     questions = await try_retry_batch(batch, batch_idx, ctx, max_retries)
     inserted_count = 0
-
+    logger.info(f"Started Inserting questions in supabase : {len(questions)}")
     for idx, item in enumerate(questions):
         question_data = item["question"]
         concept_ids = item["concept_ids"]
+
+        # Ensure required fields are present (especially for fetched questions)
+        if "activity_id" not in question_data or not question_data["activity_id"]:
+            question_data["activity_id"] = str(ctx.activity_id)
+        
+        if question_data.get("marks") is None:
+             question_data["marks"] = ctx.default_marks or 1
+
 
         # Extract SVGs before inserting question (svg is not a column in gen_questions)
         svg_list = question_data.pop("svgs", None)
@@ -239,13 +273,23 @@ async def insert_batch_to_supabase(
             else:
                 question_data["match_the_following_columns"] = cols
 
-        gen_question_insert = GenQuestionsInsert(**question_data)
+        try:
+            gen_question_insert = GenQuestionsInsert(**question_data)
+        except Exception as e:
+            logger.error(f"Validation failed for question data: {e}")
+            logger.debug(f"Problematic payload: {question_data}")
+            continue
 
-        result = (
-            supabase_client.table("gen_questions")
-            .insert(gen_question_insert.model_dump(mode="json", exclude_none=True))
-            .execute()
-        )
+        try:
+            result = (
+                supabase_client.table("gen_questions")
+                .insert(gen_question_insert.model_dump(mode="json", exclude_none=True))
+                .execute()
+            )
+        except Exception as e:
+            logger.error(f"Failed to execute insert query: {e}")
+            continue
+
 
         if result.data:
             inserted_question = result.data[0]
@@ -272,12 +316,15 @@ async def insert_batch_to_supabase(
 
             for concept_id in concept_ids:
                 try:
-                    concept_map = GenQuestionsConceptsMapsInsert(
-                        gen_question_id=question_id,
-                        concept_id=concept_id,
-                    )
+                    # UUIDv7 support fix: Bypassing strict Pydantic UUID4 validation
+                    # concept_map = GenQuestionsConceptsMapsInsert(...) 
+                    # We insert raw dict instead.
+                    concept_map_payload = {
+                        "gen_question_id": str(question_id),
+                        "concept_id": str(concept_id),
+                    }
                     supabase_client.table("gen_questions_concepts_maps").insert(
-                        concept_map.model_dump(mode="json", exclude_none=True)
+                        concept_map_payload
                     ).execute()
                 except Exception as mapping_error:
                     if "duplicate key value violates unique constraint" not in str(mapping_error):

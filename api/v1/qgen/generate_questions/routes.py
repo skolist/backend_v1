@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class QuestionTypeConfig(BaseModel):
     """Question Type Configuration for the request."""
     type: Literal[
-        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4", "match_the_following"
+        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4", "match_the_following", "solved_examples", "exercise_questions"
     ]
     count: int
 
@@ -148,6 +148,7 @@ async def generate_questions(
 
         ctx = BatchProcessingContext(
             gemini_client=gemini_client,
+            supabase_client=supabase_client,
             concepts_dict=concepts_dict,
             concepts_name_to_id=concepts_name_to_id,
             old_questions=old_questions,
