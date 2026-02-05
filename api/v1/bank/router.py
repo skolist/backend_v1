@@ -19,6 +19,7 @@ router = APIRouter(
 
 class BankFilter(BaseModel):
     subject_id: Optional[str] = None
+    chapter_id: Optional[str] = None
     question_type: Optional[str] = None
     hardness_level: Optional[str] = None
     is_solved_example: Optional[bool] = None
@@ -54,12 +55,20 @@ async def list_bank_questions(
     Fetch paginated list of bank questions with filters.
     """
     try:
+        # Debug logging
+        logger.info(f"Received filters: {request.filters}")
+        logger.info(f"Chapter ID filter: {request.filters.chapter_id}")
+        
         # Base query
         query = supabase.table("bank_questions").select("*", count="exact")
         
         # Apply Filters
         if request.filters.subject_id:
             query = query.eq("subject_id", request.filters.subject_id)
+
+        if request.filters.chapter_id:
+            logger.info(f"Applying chapter_id filter: {request.filters.chapter_id}")
+            query = query.eq("chapter_id", request.filters.chapter_id)
             
         if request.filters.question_type:
             query = query.eq("question_type", request.filters.question_type)
