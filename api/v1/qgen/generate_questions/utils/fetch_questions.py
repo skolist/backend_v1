@@ -7,6 +7,10 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+# Flags to control filtering of bank questions
+USE_IMAGE_NEEDED = False  # If False, exclude questions with is_image_needed=True
+USE_INCOMPLETE = False    # If False, exclude questions with is_incomplete=True
+
 class QuestionRequestType(Enum):
     SOLVED_EXAMPLE = "solved_example"
     EXERCISE_QUESTION = "exercise_question"
@@ -120,6 +124,15 @@ def fetch_questions_from_bank(
             .select("*, bank_questions_concepts_maps(concept_id)")\
             .in_("id", valid_q_ids)\
             .eq(flag_filter, True)
+        
+        # Filter out questions with is_image_needed=True if USE_IMAGE_NEEDED is False
+        if not USE_IMAGE_NEEDED:
+            query = query.eq("is_image_needed", False)
+        
+        # Filter out questions with is_incomplete=True if USE_INCOMPLETE is False
+        if not USE_INCOMPLETE:
+            query = query.eq("is_incomplete", False)
+        
         if target_diff:
             query = query.eq("hardness_level", target_diff)
             
