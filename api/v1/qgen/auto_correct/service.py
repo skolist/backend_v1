@@ -13,6 +13,7 @@ from fastapi import UploadFile
 from api.v1.qgen.models import AllQuestions, AutoCorrectedQuestion
 from api.v1.qgen.prompts import auto_correct_questions_prompt
 from api.v1.qgen.utils.screenshot_utils import generate_screenshot, save_image_for_debug
+from api.v1.qgen.version_service import create_new_version_on_update
 from supabase_dir import GenImagesInsert
 
 logger = logging.getLogger(__name__)
@@ -136,6 +137,9 @@ class AutoCorrectService:
                         update_data["match_the_following_columns"] = dict_cols
                     else:
                         update_data["match_the_following_columns"] = cols
+                
+                # Create new version before updating question
+                create_new_version_on_update(supabase_client, gen_question_id, update_data)
                 
                 supabase_client.table("gen_questions").update(update_data).eq(
                     "id", gen_question_id

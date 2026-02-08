@@ -16,6 +16,7 @@ from google import genai
 
 from api.v1.qgen.models import AllQuestions
 from api.v1.qgen.prompts import regenerate_question_prompt
+from api.v1.qgen.version_service import create_new_version_on_update
 from supabase_dir import GenImagesInsert
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,9 @@ class RegenerateService:
                         update_data["match_the_following_columns"] = dict_cols
                     else:
                         update_data["match_the_following_columns"] = cols
+                
+                # Create new version before updating question
+                create_new_version_on_update(supabase_client, gen_question_id, update_data)
                 
                 supabase_client.table("gen_questions").update(update_data).eq(
                     "id", gen_question_id

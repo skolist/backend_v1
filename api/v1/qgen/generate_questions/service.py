@@ -23,6 +23,7 @@ from ..models import (
 )
 from .models import QUESTION_TYPE_TO_SCHEMA_WITH_CONCEPTS
 from ..prompts import generate_questions_with_concepts_prompt
+from ..version_service import create_initial_version
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +296,9 @@ async def insert_batch_to_supabase(
             inserted_question = result.data[0]
             question_id = inserted_question["id"]
             inserted_count += 1
+
+            # Create initial version (v0) for undo/redo functionality
+            create_initial_version(supabase_client, question_id, inserted_question)
 
             # Insert SVGs into gen_images table if present
             if svg_list:
