@@ -218,7 +218,10 @@ class GenQuestionVersionsBaseSchema(CustomModel):
 	explanation: str | None = Field(default=None)
 	gen_question_id: UUID4 | None = Field(default=None)
 	hardness_level: PublicHardnessLevelEnumEnum
+	is_active: bool
+	is_deleted: bool
 	marks: int
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
 	msq_option3_answer: bool | None = Field(default=None)
@@ -229,6 +232,7 @@ class GenQuestionVersionsBaseSchema(CustomModel):
 	option4: str | None = Field(default=None)
 	question_text: str | None = Field(default=None)
 	question_type: PublicQuestionTypeEnumEnum
+	version_index: int
 
 
 class GenQuestionsBaseSchema(CustomModel):
@@ -246,6 +250,7 @@ class GenQuestionsBaseSchema(CustomModel):
 	hardness_level: PublicHardnessLevelEnumEnum
 	is_exercise_question: bool = Field(description="1 if the question is pushed here from the bank question table where is_exercise_question  was true")
 	is_in_draft: bool
+	is_new: bool
 	is_page_break_below: bool = Field(description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
 	is_solved_example: bool = Field(description="1 if the question is pushed here from the bank question table where is_solved_example was true")
 	marks: int
@@ -452,6 +457,7 @@ class UsersBaseSchema(CustomModel):
 	created_at: datetime.datetime
 	credits: int
 	email: str | None = Field(default=None)
+	is_test_user: bool
 	last_active_at: datetime.datetime = Field(description="To track user Churn")
 	name: Annotated[str, StringConstraints(**{'max_length': 50})] | None = Field(default=None, description="The Full Name of The User")
 	org_id: UUID4 | None = Field(default=None)
@@ -498,7 +504,7 @@ class BankQuestionsInsert(CustomModelInsert):
 	# created_at: has default value
 	# explanation: nullable
 	# figure: nullable
-	# hardness_level: nullable
+	# hardness_level: nullable, has default value
 	# is_from_exercise: has default value
 	# is_image_needed: has default value
 	# is_incomplete: has default value
@@ -703,6 +709,9 @@ class GenQuestionVersionsInsert(CustomModelInsert):
 	# created_at: has default value
 	# explanation: nullable
 	# gen_question_id: nullable
+	# is_active: has default value
+	# is_deleted: has default value
+	# match_the_following_columns: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
 	# msq_option3_answer: nullable
@@ -712,6 +721,7 @@ class GenQuestionVersionsInsert(CustomModelInsert):
 	# option3: nullable
 	# option4: nullable
 	# question_text: nullable
+	# version_index: has default value
 	
 	# Required fields
 	answer_text: str
@@ -724,6 +734,9 @@ class GenQuestionVersionsInsert(CustomModelInsert):
 	created_at: datetime.datetime | None = Field(default=None)
 	explanation: str | None = Field(default=None)
 	gen_question_id: UUID4 | None = Field(default=None)
+	is_active: bool | None = Field(default=None)
+	is_deleted: bool | None = Field(default=None)
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
 	msq_option3_answer: bool | None = Field(default=None)
@@ -733,6 +746,7 @@ class GenQuestionVersionsInsert(CustomModelInsert):
 	option3: str | None = Field(default=None)
 	option4: str | None = Field(default=None)
 	question_text: str | None = Field(default=None)
+	version_index: int | None = Field(default=None)
 
 
 class GenQuestionsInsert(CustomModelInsert):
@@ -747,6 +761,7 @@ class GenQuestionsInsert(CustomModelInsert):
 	# explanation: nullable
 	# is_exercise_question: has default value
 	# is_in_draft: has default value
+	# is_new: has default value
 	# is_page_break_below: has default value
 	# is_solved_example: has default value
 	# match_the_following_columns: nullable
@@ -776,6 +791,7 @@ class GenQuestionsInsert(CustomModelInsert):
 	explanation: str | None = Field(default=None, description="explanation for the question and answer")
 	is_exercise_question: bool | None = Field(default=None, description="1 if the question is pushed here from the bank question table where is_exercise_question  was true")
 	is_in_draft: bool | None = Field(default=None)
+	is_new: bool | None = Field(default=None)
 	is_page_break_below: bool | None = Field(default=None, description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
 	is_solved_example: bool | None = Field(default=None, description="1 if the question is pushed here from the bank question table where is_solved_example was true")
 	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
@@ -1079,6 +1095,7 @@ class UsersInsert(CustomModelInsert):
 	# created_at: has default value
 	# credits: has default value
 	# email: nullable
+	# is_test_user: has default value
 	# last_active_at: has default value
 	# name: nullable
 	# org_id: nullable
@@ -1097,6 +1114,7 @@ class UsersInsert(CustomModelInsert):
 	created_at: datetime.datetime | None = Field(default=None)
 	credits: int | None = Field(default=None)
 	email: str | None = Field(default=None)
+	is_test_user: bool | None = Field(default=None)
 	last_active_at: datetime.datetime | None = Field(default=None, description="To track user Churn")
 	name: Annotated[str, StringConstraints(**{'max_length': 50})] | None = Field(default=None, description="The Full Name of The User")
 	org_id: UUID4 | None = Field(default=None)
@@ -1139,7 +1157,7 @@ class BankQuestionsUpdate(CustomModelUpdate):
 	# created_at: has default value
 	# explanation: nullable
 	# figure: nullable
-	# hardness_level: nullable
+	# hardness_level: nullable, has default value
 	# is_from_exercise: has default value
 	# is_image_needed: has default value
 	# is_incomplete: has default value
@@ -1334,6 +1352,9 @@ class GenQuestionVersionsUpdate(CustomModelUpdate):
 	# created_at: has default value
 	# explanation: nullable
 	# gen_question_id: nullable
+	# is_active: has default value
+	# is_deleted: has default value
+	# match_the_following_columns: nullable
 	# msq_option1_answer: nullable
 	# msq_option2_answer: nullable
 	# msq_option3_answer: nullable
@@ -1343,6 +1364,7 @@ class GenQuestionVersionsUpdate(CustomModelUpdate):
 	# option3: nullable
 	# option4: nullable
 	# question_text: nullable
+	# version_index: has default value
 	
 		# Optional fields
 	answer_text: str | None = Field(default=None)
@@ -1351,7 +1373,10 @@ class GenQuestionVersionsUpdate(CustomModelUpdate):
 	explanation: str | None = Field(default=None)
 	gen_question_id: UUID4 | None = Field(default=None)
 	hardness_level: PublicHardnessLevelEnumEnum | None = Field(default=None)
+	is_active: bool | None = Field(default=None)
+	is_deleted: bool | None = Field(default=None)
 	marks: int | None = Field(default=None)
+	match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
 	msq_option1_answer: bool | None = Field(default=None)
 	msq_option2_answer: bool | None = Field(default=None)
 	msq_option3_answer: bool | None = Field(default=None)
@@ -1362,6 +1387,7 @@ class GenQuestionVersionsUpdate(CustomModelUpdate):
 	option4: str | None = Field(default=None)
 	question_text: str | None = Field(default=None)
 	question_type: PublicQuestionTypeEnumEnum | None = Field(default=None)
+	version_index: int | None = Field(default=None)
 
 
 class GenQuestionsUpdate(CustomModelUpdate):
@@ -1376,6 +1402,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
 	# explanation: nullable
 	# is_exercise_question: has default value
 	# is_in_draft: has default value
+	# is_new: has default value
 	# is_page_break_below: has default value
 	# is_solved_example: has default value
 	# match_the_following_columns: nullable
@@ -1401,6 +1428,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
 	hardness_level: PublicHardnessLevelEnumEnum | None = Field(default=None)
 	is_exercise_question: bool | None = Field(default=None, description="1 if the question is pushed here from the bank question table where is_exercise_question  was true")
 	is_in_draft: bool | None = Field(default=None)
+	is_new: bool | None = Field(default=None)
 	is_page_break_below: bool | None = Field(default=None, description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated")
 	is_solved_example: bool | None = Field(default=None, description="1 if the question is pushed here from the bank question table where is_solved_example was true")
 	marks: int | None = Field(default=None)
@@ -1688,6 +1716,7 @@ class UsersUpdate(CustomModelUpdate):
 	# created_at: has default value
 	# credits: has default value
 	# email: nullable
+	# is_test_user: has default value
 	# last_active_at: has default value
 	# name: nullable
 	# org_id: nullable
@@ -1703,6 +1732,7 @@ class UsersUpdate(CustomModelUpdate):
 	created_at: datetime.datetime | None = Field(default=None)
 	credits: int | None = Field(default=None)
 	email: str | None = Field(default=None)
+	is_test_user: bool | None = Field(default=None)
 	last_active_at: datetime.datetime | None = Field(default=None, description="To track user Churn")
 	name: Annotated[str, StringConstraints(**{'max_length': 50})] | None = Field(default=None, description="The Full Name of The User")
 	org_id: UUID4 | None = Field(default=None)
