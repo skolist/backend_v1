@@ -3,7 +3,8 @@ import json
 import os
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 
 from google import genai
@@ -37,6 +38,9 @@ class BatchProcessingContext:
     old_questions: List[dict]  # historical questions for reference
     activity_id: uuid.UUID
     default_marks: int = 1
+    # Timestamp tracking for ordered question insertion
+    base_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp_offset_ms: int = 0  # Counter for ordering questions
 
 class BatchGenerationError(Exception):
     """Raised when batch generation fails after all retries."""
@@ -258,6 +262,13 @@ async def insert_batch_to_supabase(
 
         # Extract SVGs before inserting question (svg is not a column in gen_questions)
         svg_list = question_data.pop("svgs", None)
+        
+        # Set created_at with offset to preserve insertion order
+        # Earlier inserted questions get higher timestamps (appear first in DESC order)
+        offset = ctx.timestamp_offset_ms
+        ctx.timestamp_offset_ms += 1
+        question_created_at = ctx.base_timestamp - timedelta(milliseconds=offset)
+        question_data["created_at"] = question_created_at.isoformat()
         
         # Map columns to match_the_following_columns if present
         if "columns" in question_data:
