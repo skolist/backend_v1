@@ -4,7 +4,8 @@
 pytest==9.0.2
 pytest-asyncio==1.3.0
 pytest-xdist==3.8.0
-black==25.12.0
+ruff>=0.3.0
+pre-commit>=3.6.0
 pylint==4.0.4
 # Ensures Starlette/FastAPI TestClient works even if httpx isn't pulled in transitively.
 httpx==0.28.1
