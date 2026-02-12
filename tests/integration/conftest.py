@@ -22,20 +22,15 @@ from app import create_app
 from supabase_dir import PublicProductTypeEnumEnum
 from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
 
-# Mock BrowserService for integration tests
-class MockBrowserService:
-    def __init__(self):
-        self.browser = "mock_browser_instance"
-    
-    async def start(self):
-        pass
-        
-    async def stop(self):
-        pass
-        
-    async def take_screenshot(self, *args, **kwargs):
-        return b"fake_screenshot_bytes"
 
+# ============================================================================
+# TEST USER CREDENTIALS (seeded by skolist-db/seed_users.py)
+# ============================================================================
+# These are hardcoded because they're fixed test data for local Supabase.
+# Do not change these unless you also update seed_users.py.
+
+TEST_USER_EMAIL = "test@example.com"
+TEST_USER_PASSWORD = "password123"
 
 
 # ============================================================================
@@ -103,14 +98,19 @@ def create_mock_fill_in_blank(question_text: str | None = None) -> FillInTheBlan
 
 
 class MockParsedResponse:
-    """Mock for response.parsed attribute."""
+    """Mock for Gemini API response with both .parsed and .text attributes."""
 
-    def __init__(self, parsed_obj: Any):
+    def __init__(self, parsed_obj: Any, text: str = ""):
         self._parsed = parsed_obj
+        self._text = text
 
     @property
     def parsed(self):
         return self._parsed
+
+    @property
+    def text(self):
+        return self._text
 
 
 class MockQuestionsResponse:
@@ -131,8 +131,23 @@ class MockGeminiModels:
     ) -> MockParsedResponse:
         """Mock generate_content that returns appropriate responses based on schema."""
         schema = config.get("response_schema")
-        schema_name = getattr(schema, "__name__", str(schema))
-        contents_str = str(contents).lower()
+        schema_name = getattr(schema, "__name__", str(schema)) if schema else ""
+        
+        # Convert contents to string for pattern matching
+        # Handle both string and list of Part objects
+        if isinstance(contents, list):
+            contents_str = " ".join(str(c) for c in contents).lower()
+        else:
+            contents_str = str(contents).lower()
+
+        # Handle edit_svg endpoint (unstructured response - no schema, uses .text)
+        # This endpoint doesn't use response_schema and expects raw text response
+        if "response_schema" not in config and ("svg" in contents_str or "edit" in contents_str or "circle" in contents_str):
+            mock_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="75" fill="blue"/>
+    <text x="100" y="100" text-anchor="middle">r = 75</text>
+</svg>'''
+            return MockParsedResponse(None, text=mock_svg)
 
         # Handle auto-correct endpoint (returns wrapper with .question)
         if "AutoCorrected" in schema_name:
@@ -171,6 +186,18 @@ class MockGeminiModels:
                     )
 
                 return MockParsedResponse(QuestionWrapper())
+
+        # Handle get_feedback endpoint (returns FeedbackList with .feedbacks)
+        if "FeedbackList" in schema_name or "feedback" in contents_str.lower():
+            from api.v1.qgen.models import FeedbackItem, FeedbackList
+            
+            feedback_list = FeedbackList(
+                feedbacks=[
+                    FeedbackItem(message="Consider adding more variety in question difficulty levels.", priority=7),
+                    FeedbackItem(message="Some questions could benefit from clearer wording.", priority=5),
+                ]
+            )
+            return MockParsedResponse(feedback_list)
 
         # Handle question generation schemas (returns wrapper with .questions list)
         if "mcq4" in contents_str:
@@ -225,7 +252,7 @@ def mock_gemini_client(use_live_gemini):
         # Use real Gemini API
         yield
     else:
-        # Patch genai.Client in all qgen modules
+        # Patch genai.Client in all modules that use it
         with patch(
             "api.v1.qgen.generate_questions.routes.genai.Client", MockGeminiClient
         ), patch(
@@ -234,6 +261,12 @@ def mock_gemini_client(use_live_gemini):
             "api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient
         ), patch(
             "api.v1.qgen.regenerate_with_prompt.routes.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.qgen.get_feedback.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.qgen.edit_svg.service.genai.Client", MockGeminiClient
+        ), patch(
+            "api.v1.bank.router.genai.Client", MockGeminiClient
         ):
             yield
 
@@ -294,8 +327,6 @@ def env(request) -> Dict[str, str]:
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
     supabase_service_key = os.getenv("SUPABASE_SERVICE_KEY")
-    test_user_email = os.getenv("TEST_USER_EMAIL")
-    test_user_password = os.getenv("TEST_USER_PASSWORD")
     gemini_api_key = os.getenv("GEMINI_API_KEY")
 
     # Base required vars (always needed for Supabase)
@@ -303,8 +334,6 @@ def env(request) -> Dict[str, str]:
         ("SUPABASE_URL", supabase_url),
         ("SUPABASE_ANON_KEY", supabase_anon_key),
         ("SUPABASE_SERVICE_KEY", supabase_service_key),
-        ("TEST_USER_EMAIL", test_user_email),
-        ("TEST_USER_PASSWORD", test_user_password),
     ]
 
     # GEMINI_API_KEY only required with --gemini-live
@@ -319,10 +348,7 @@ def env(request) -> Dict[str, str]:
         "SUPABASE_URL": supabase_url,
         "SUPABASE_ANON_KEY": supabase_anon_key,
         "SUPABASE_SERVICE_KEY": supabase_service_key,
-        "TEST_USER_EMAIL": test_user_email,
-        "TEST_USER_PASSWORD": test_user_password,
-        "GEMINI_API_KEY": gemini_api_key
-        or "mock-api-key",  # Provide dummy value for mocks
+        "GEMINI_API_KEY": gemini_api_key or "mock-api-key",
     }
 
 
@@ -341,15 +367,20 @@ def service_supabase_client(env: Dict[str, str]) -> Client:
 
 
 @pytest.fixture(scope="session")
-def auth_session(env: Dict[str, str]) -> Dict[str, Any]:
+def auth_session(env: Dict[str, str], service_supabase_client: Client) -> Dict[str, Any]:
     """
     Authenticate as test user and return session info.
+    
+    Uses hardcoded credentials from TEST_USER_EMAIL/TEST_USER_PASSWORD constants.
+    These users are seeded by skolist-db/seed_users.py.
+    
+    Also ensures the user exists in public.users as a non-admin (private_user).
     """
     client = create_client(env["SUPABASE_URL"], env["SUPABASE_ANON_KEY"])
     auth_response = client.auth.sign_in_with_password(
         {
-            "email": env["TEST_USER_EMAIL"],
-            "password": env["TEST_USER_PASSWORD"],
+            "email": TEST_USER_EMAIL,
+            "password": TEST_USER_PASSWORD,
         }
     )
 
@@ -362,6 +393,15 @@ def auth_session(env: Dict[str, str]) -> Dict[str, Any]:
     if not user_id:
         pytest.fail("Failed to get user ID from Supabase sign-in")
 
+    # Ensure user exists in public.users as non-admin with credits
+    # This resets any admin status from previous test runs
+    service_supabase_client.table("users").upsert({
+        "id": user_id,
+        "email": TEST_USER_EMAIL,
+        "user_type": "private_user",
+        "credits": 10000,  # Give test user plenty of credits
+    }).execute()
+
     return {
         "access_token": token,
         "user_id": user_id,
@@ -373,41 +413,65 @@ def auth_session(env: Dict[str, str]) -> Dict[str, Any]:
 # ============================================================================
 
 
-@pytest.fixture(scope="session", autouse=True)
-def mock_browser_service_patch():
+@pytest.fixture(scope="session")
+def app(service_supabase_client: Client):
     """
-    Mock BrowserService globally for the session to avoid real Playwright startup.
-    This must persist during lifespan execution.
+    Create the FastAPI application instance with test Supabase client.
+    
+    Overrides get_supabase_client to use the same Supabase instance that
+    the tests authenticate against, ensuring JWT validation succeeds.
     """
-    with patch("services.browser_service.BrowserService", MockBrowserService):
-        yield
+    from api.v1.auth import get_supabase_client
+    
+    # Clear any cached client that may point to a different Supabase instance
+    get_supabase_client.cache_clear()
+    
+    app_instance = create_app()
+    
+    # Override the get_supabase_client dependency to return our test client
+    app_instance.dependency_overrides[get_supabase_client] = lambda: service_supabase_client
+    
+    # Also patch the function directly since require_supabase_user calls it directly
+    with patch("api.v1.auth.get_supabase_client", return_value=service_supabase_client):
+        yield app_instance
 
 
 @pytest.fixture(scope="session")
-def app():
+def _lifespan_client(app) -> Generator[TestClient, None, None]:
     """
-    Create the FastAPI application instance.
+    Session-scoped TestClient that properly triggers app lifespan events.
+    
+    This ensures BrowserService and other startup/shutdown code runs once
+    at the start/end of the test session.
     """
-    return create_app()
+    with TestClient(app) as client:
+        yield client
 
 
 @pytest.fixture(scope="session")
-def test_client(app, auth_session: Dict[str, Any]) -> TestClient:
+def test_client(_lifespan_client: TestClient, auth_session: Dict[str, Any]) -> TestClient:
     """
-    Create a TestClient with authentication headers.
+    Create an authenticated TestClient.
+    
+    Reuses the lifespan client and adds authentication headers.
     """
-    client = TestClient(app)
-    # Set default headers for all requests
-    client.headers["Authorization"] = f"Bearer {auth_session['access_token']}"
-    return client
+    _lifespan_client.headers["Authorization"] = f"Bearer {auth_session['access_token']}"
+    return _lifespan_client
 
 
 @pytest.fixture
-def unauthenticated_test_client(app) -> TestClient:
+def unauthenticated_test_client(_lifespan_client: TestClient) -> TestClient:
     """
     Create a TestClient without authentication headers.
+    
+    Temporarily clears auth headers for this test.
     """
-    return TestClient(app)
+    # Save and clear auth header
+    original_auth = _lifespan_client.headers.pop("Authorization", None)
+    yield _lifespan_client
+    # Restore auth header if it was set
+    if original_auth:
+        _lifespan_client.headers["Authorization"] = original_auth
 
 
 # ============================================================================

@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
 filterwarnings = [
     # Ignore deprecation warnings from third-party packages
     "ignore::DeprecationWarning:pyiceberg.*",
@@ -10,4 +13,10 @@ filterwarnings = [
 ]
 markers = [
     "slow: marks tests as slow (use -m 'not slow' to skip)",
+    "unit: marks as unit test (no external dependencies)",
+    "integration: marks as integration test (requires Supabase)",
+    "live_gemini: marks tests that require --gemini-live flag",
+    "auth: marks authentication-related tests",
+    "qgen: marks question generation tests",
+    "bank: marks bank management tests",
 ]

@@ -13,6 +13,11 @@ from supabase import create_client
 from app import create_app
 
 
+# Hardcoded test credentials - must match skolist-db/seed_users.py
+TEST_USER_EMAIL = "test@example.com"
+TEST_USER_PASSWORD = "password123"
+
+
 def _get_session_access_token(auth_response) -> str | None:
     """Extract access_token from supabase-py auth response across versions."""
     session = getattr(auth_response, "session", None)
@@ -33,21 +38,18 @@ def _get_session_access_token(auth_response) -> str | None:
 def env() -> dict:
     """
     Function to load required environment variables for Supabase auth tests.
+    Uses hardcoded test credentials that match skolist-db/seed_users.py.
     """
     load_dotenv()
 
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
-    test_user_email = os.getenv("TEST_USER_EMAIL")
-    test_user_password = os.getenv("TEST_USER_PASSWORD")
 
     missing = [
         name
         for name, value in [
             ("SUPABASE_URL", supabase_url),
             ("SUPABASE_ANON_KEY", supabase_anon_key),
-            ("TEST_USER_EMAIL", test_user_email),
-            ("TEST_USER_PASSWORD", test_user_password),
         ]
         if not value
     ]
@@ -61,8 +63,8 @@ def env() -> dict:
     return {
         "SUPABASE_URL": supabase_url,
         "SUPABASE_ANON_KEY": supabase_anon_key,
-        "TEST_USER_EMAIL": test_user_email,
-        "TEST_USER_PASSWORD": test_user_password,
+        "TEST_USER_EMAIL": TEST_USER_EMAIL,
+        "TEST_USER_PASSWORD": TEST_USER_PASSWORD,
     }
 
 

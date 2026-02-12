@@ -90,6 +90,9 @@ async def auto_correct_question(
         
         return Response(status_code=status.HTTP_200_OK)
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (404, 402, 503, etc.) as-is
+        raise
     except QuestionProcessingError as e:
         logger.exception("Error auto correcting question")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e

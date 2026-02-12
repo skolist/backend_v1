@@ -10,6 +10,7 @@ including the build_batches_end_to_end function and the new refactored architect
 
 import uuid
 from typing import Dict, List
+from unittest.mock import MagicMock
 
 import pytest
 import google.genai as genai
@@ -105,6 +106,14 @@ def mock_old_questions() -> List[dict]:
 def mock_activity_id() -> uuid.UUID:
     """Mock activity ID."""
     return uuid.UUID("770e8400-e29b-41d4-a716-446655440001")
+
+
+@pytest.fixture
+def mock_supabase_client():
+    """Create a mock Supabase client for BatchProcessingContext."""
+    client = MagicMock()
+    client.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
+    return client
 
 
 # ============================================================================
@@ -535,6 +544,7 @@ class TestBatchProcessingContext:
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
+        mock_supabase_client,
     ):
         """Test that BatchProcessingContext is created correctly."""
         ctx = BatchProcessingContext(
@@ -543,6 +553,7 @@ class TestBatchProcessingContext:
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+            supabase_client=mock_supabase_client,
         )
 
         assert ctx.gemini_client == gemini_client
@@ -559,6 +570,7 @@ class TestBatchProcessingContext:
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
+        mock_supabase_client,
     ):
         """Test that BatchProcessingContext accepts custom marks."""
         ctx = BatchProcessingContext(
@@ -567,6 +579,7 @@ class TestBatchProcessingContext:
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+            supabase_client=mock_supabase_client,
             default_marks=5,
         )
 
@@ -600,6 +613,7 @@ class TestProcessBatchGeneration:
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
+        mock_supabase_client,
     ) -> BatchProcessingContext:
         """Create a BatchProcessingContext for testing."""
         return BatchProcessingContext(
@@ -608,6 +622,7 @@ class TestProcessBatchGeneration:
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+            supabase_client=mock_supabase_client,
         )
 
     @pytest.mark.asyncio
@@ -658,6 +673,7 @@ class TestProcessBatchGenerationAndValidate:
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
+        mock_supabase_client,
     ) -> BatchProcessingContext:
         """Create a BatchProcessingContext for testing."""
         return BatchProcessingContext(
@@ -666,6 +682,7 @@ class TestProcessBatchGenerationAndValidate:
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+            supabase_client=mock_supabase_client,
         )
 
     @pytest.mark.asyncio
@@ -789,6 +806,7 @@ class TestTryRetryBatch:
         mock_concepts_name_to_id: Dict[str, str],
         mock_old_questions: List[dict],
         mock_activity_id: uuid.UUID,
+        mock_supabase_client,
     ) -> BatchProcessingContext:
         """Create a BatchProcessingContext for testing."""
         return BatchProcessingContext(
@@ -797,6 +815,7 @@ class TestTryRetryBatch:
             concepts_name_to_id=mock_concepts_name_to_id,
             old_questions=mock_old_questions,
             activity_id=mock_activity_id,
+            supabase_client=mock_supabase_client,
         )
 
     @pytest.mark.asyncio

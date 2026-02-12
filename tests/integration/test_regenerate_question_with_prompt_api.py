@@ -12,7 +12,7 @@ from typing import Any, Dict, Generator
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
-
+from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, PublicQuestionTypeEnumEnum
 
 # ============================================================================
 # FIXTURE FOR TEST QUESTION
@@ -29,25 +29,27 @@ def test_gen_question_for_prompt_regeneration(
     """
     question_id = str(uuid.uuid4())
 
-    question_data = {
-        "id": question_id,
-        "activity_id": test_activity["id"],
-        "question_text": "What is the speed of light in a vacuum?",
-        "question_type": "mcq4",
-        "option1": "3 x 10^6 m/s",
-        "option2": "3 x 10^7 m/s",
-        "option3": "3 x 10^8 m/s",
-        "option4": "3 x 10^9 m/s",
-        "correct_mcq_option": 3,
-        "answer_text": "3 x 10^8 m/s",
-        "explanation": "The speed of light in a vacuum is approximately 3 x 10^8 meters per second.",
-        "hardness_level": "medium",
-        "marks": 2,
-    }
+    question_data = GenQuestionsInsert(
+        id=uuid.UUID(question_id),
+        activity_id=uuid.UUID(test_activity["id"]),
+        question_text="What is the speed of light in a vacuum?",
+        question_type=PublicQuestionTypeEnumEnum.MCQ4,
+        option1="3 x 10^6 m/s",
+        option2="3 x 10^7 m/s",
+        option3="3 x 10^8 m/s",
+        option4="3 x 10^9 m/s",
+        correct_mcq_option=3,
+        answer_text="3 x 10^8 m/s",
+        explanation="The speed of light in a vacuum is approximately 3 x 10^8 meters per second.",
+        hardness_level=PublicHardnessLevelEnumEnum.MEDIUM,
+        marks=2,
+    )
 
     # Insert question
     response = (
-        service_supabase_client.table("gen_questions").insert(question_data).execute()
+        service_supabase_client.table("gen_questions")
+        .insert(question_data.model_dump(mode="json", exclude_none=True))
+        .execute()
     )
 
     yield response.data[0]

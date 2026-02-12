@@ -105,6 +105,8 @@ async def regenerate_question_with_prompt(
         
         return Response(status_code=status.HTTP_200_OK)
 
+    except HTTPException:
+        raise
     except QuestionProcessingError as e:
         logger.exception("Error processing regeneration")
         raise HTTPException(status_code=500, detail="Internal Server Error") from e

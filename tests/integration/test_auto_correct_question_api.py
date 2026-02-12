@@ -11,7 +11,7 @@ from typing import Any, Dict, Generator
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
-
+from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, PublicQuestionTypeEnumEnum
 
 # ============================================================================
 # FIXTURE FOR TEST QUESTION
@@ -29,25 +29,27 @@ def test_gen_question(
     """
     question_id = str(uuid.uuid4())
 
-    question_data = {
-        "id": question_id,
-        "activity_id": test_activity["id"],
-        "question_text": "What is the formula for kinetc energy? (intentional misspelling)",
-        "question_type": "mcq4",
-        "option1": "KE = m*v^2",
-        "option2": "KE = 1/2*m*v",
-        "option3": "KE = 1/2*m*v^2",
-        "option4": "KE = m*g*h",
-        "correct_mcq_option": 3,
-        "answer_text": "KE = 1/2*m*v^2",
-        "explanation": "The kinetic energy formula is KE = half of mass times velocity squared",
-        "hardness_level": "medium",
-        "marks": 2,
-    }
+    question_data = GenQuestionsInsert(
+        id=uuid.UUID(question_id),
+        activity_id=uuid.UUID(test_activity["id"]),
+        question_text="What is the formula for kinetc energy? (intentional misspelling)",
+        question_type=PublicQuestionTypeEnumEnum.MCQ4,
+        option1="KE = m*v^2",
+        option2="KE = 1/2*m*v",
+        option3="KE = 1/2*m*v^2",
+        option4="KE = m*g*h",
+        correct_mcq_option=3,
+        answer_text="KE = 1/2*m*v^2",
+        explanation="The kinetic energy formula is KE = half of mass times velocity squared",
+        hardness_level=PublicHardnessLevelEnumEnum.MEDIUM,
+        marks=2,
+    )
 
     # Insert question
     response = (
-        service_supabase_client.table("gen_questions").insert(question_data).execute()
+        service_supabase_client.table("gen_questions")
+        .insert(question_data.model_dump(mode="json", exclude_none=True))
+        .execute()
     )
 
     yield response.data[0]
