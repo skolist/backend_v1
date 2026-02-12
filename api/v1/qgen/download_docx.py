@@ -5,7 +5,7 @@ import requests
 from typing import Optional
 from datetime import time
 from docx import Document
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches, Pt, RGBColor, Mm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -18,6 +18,12 @@ from pydantic import BaseModel
 
 from api.v1.auth import get_supabase_client
 from api.v1.qgen.utils.paper_utils import fetch_paper_data, format_duration
+from api.v1.qgen.paper_layout_config import (
+    PAGE_MARGIN_TOP_MM,
+    PAGE_MARGIN_RIGHT_MM,
+    PAGE_MARGIN_BOTTOM_MM,
+    PAGE_MARGIN_LEFT_MM,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +177,13 @@ async def download_docx(
     # 3. Build DOCX
     try:
         doc = Document()
+        
+        # Set page margins from config (synced with frontend/PDF)
+        section = doc.sections[0]
+        section.top_margin = Mm(PAGE_MARGIN_TOP_MM)
+        section.right_margin = Mm(PAGE_MARGIN_RIGHT_MM)
+        section.bottom_margin = Mm(PAGE_MARGIN_BOTTOM_MM)
+        section.left_margin = Mm(PAGE_MARGIN_LEFT_MM)
         
         # Set default font
         style = doc.styles['Normal']

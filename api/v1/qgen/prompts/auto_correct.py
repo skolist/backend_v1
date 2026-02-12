@@ -25,6 +25,7 @@ def auto_correct_questions_prompt(gen_question: dict) -> str:
     If Diagram is/are required for the questions, then generate it following the below SVG Instructions.
     Common Latex Errors are:
         {COMMON_INSTRUCTIONS}
+    Sometimes, if correction is requested, it may be related to unnecessary use of display math ($$...$$) for simple expressions that could be rendered as inline math ($...$). Display math can cause rendering issues in some contexts, so check if any simple expressions are unnecessarily using display math and convert them to inline math for better compatibility with KaTeX rendering.
     Svg Instructions are:
         {COMMON_SVG_INSTRUCTIONS}
     Correct everything , the image would inlude the question text, answer text, options etc. if there are any latex / katex rendering errors , you can check from image if image is attached. Use this image as source of truth, your output is rendered as that image, do necessary actions if there are any katex errors (we are using katex node module at the frontend to render your image)

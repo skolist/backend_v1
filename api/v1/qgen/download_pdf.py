@@ -10,6 +10,30 @@ from playwright.async_api import async_playwright
 
 from api.v1.auth import get_supabase_client
 from api.v1.qgen.utils.paper_utils import fetch_paper_data, format_duration
+from api.v1.qgen.paper_layout_config import (
+    get_pdf_margins,
+    HEADER_MARGIN_BOTTOM,
+    HEADER_LOGO_HEIGHT,
+    HEADER_LOGO_MARGIN_BOTTOM,
+    HEADER_TITLE_MARGIN_TOP,
+    HEADER_META_MARGIN_TOP,
+    HEADER_META_PADDING_Y,
+    HEADER_META_GAP,
+    INSTRUCTIONS_MARGIN_BOTTOM,
+    INSTRUCTIONS_PADDING_BOTTOM,
+    INSTRUCTIONS_TITLE_MARGIN_BOTTOM,
+    INSTRUCTIONS_LIST_PADDING_LEFT,
+    INSTRUCTIONS_ITEM_GAP,
+    SECTION_MARGIN_TOP,
+    SECTION_MARGIN_BOTTOM,
+    QUESTION_MARGIN_BOTTOM,
+    QUESTION_FLEX_GAP,
+    OPTIONS_MARGIN_TOP,
+    OPTIONS_GAP_X,
+    OPTIONS_GAP_Y,
+    ANSWER_MARGIN_BOTTOM,
+    ANSWER_EXPLANATION_MARGIN_TOP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +79,7 @@ async def download_pdf(
             pdf_options={
                 "format": "A4",
                 "print_background": True,
-                "margin": {"top": "20mm", "bottom": "20mm", "left": "20mm", "right": "20mm"}
+                "margin": get_pdf_margins()
             }
         )
 
@@ -73,7 +97,7 @@ async def download_pdf(
         raise HTTPException(status_code=500, detail="Failed to generate PDF") from e
 
 def generate_paper_html(draft, sections, questions, instructions, logo_url, mode, images_map=None):
-    # CSS for the paper - Synchronized with PaperPreview.tsx
+    # CSS for the paper - Values from paper_layout_config.py (synced with frontend index.css)
     css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
@@ -93,13 +117,13 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     
     .header { 
         text-align: center; 
-        margin-bottom: 24px; 
+        margin-bottom: """ + HEADER_MARGIN_BOTTOM + """; 
     }
     
     .logo { 
-        height: 64px; 
+        height: """ + HEADER_LOGO_HEIGHT + """;
         width: auto;
-        margin-bottom: 8px; 
+        margin-bottom: """ + HEADER_LOGO_MARGIN_BOTTOM + """; 
         object-fit: contain;
     }
     
@@ -115,15 +139,15 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     .paper-title { 
         font-size: 20px; 
         font-weight: bold; 
-        margin: 4px 0 0 0; 
+        margin: """ + HEADER_TITLE_MARGIN_TOP + """ 0 0 0; 
         line-height: 1.2;
     }
     
     .meta-box { 
         border-top: 2px solid black; 
         border-bottom: 2px solid black; 
-        padding: 8px 8px; 
-        margin-top: 16px; 
+        padding: """ + HEADER_META_PADDING_Y + """ 8px; 
+        margin-top: """ + HEADER_META_MARGIN_TOP + """; 
         display: flex; 
         justify-content: space-between; 
         font-weight: bold; 
@@ -133,24 +157,24 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     .meta-column {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: """ + HEADER_META_GAP + """;
     }
     
     .instructions { 
-        margin-bottom: 8px; 
+        margin-bottom: """ + INSTRUCTIONS_MARGIN_BOTTOM + """; 
         border-bottom: 2px solid black; 
-        padding-bottom: 16px; 
+        padding-bottom: """ + INSTRUCTIONS_PADDING_BOTTOM + """; 
     }
     
     .instructions-title { 
         font-weight: bold; 
         font-size: 14px; 
-        margin-bottom: 4px; 
+        margin-bottom: """ + INSTRUCTIONS_TITLE_MARGIN_BOTTOM + """; 
     }
     
     .instructions-list { 
         margin: 0; 
-        padding-left: 20px; 
+        padding-left: """ + INSTRUCTIONS_LIST_PADDING_LEFT + """; 
         font-size: 14px; 
         font-weight: 500;
         list-style-type: decimal;
@@ -158,15 +182,16 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     
     .instructions-list li {
         padding-left: 4px;
-        margin-bottom: 4px;
+        margin-bottom: """ + INSTRUCTIONS_ITEM_GAP + """;
     }
     
     .section-header { 
-        display: flex; 
-        justify-content: space-between; 
+        display: flex;
+        position: relative;
+        justify-content: center; 
         align-items: baseline; 
-        margin-top: 24px; 
-        margin-bottom: 16px; 
+        margin-top: """ + SECTION_MARGIN_TOP + """; 
+        margin-bottom: """ + SECTION_MARGIN_BOTTOM + """; 
     }
     
     .section-name { 
@@ -177,14 +202,16 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     }
     
     .section-marks { 
+        position: absolute;
+        right: 0;
         font-weight: bold; 
         font-size: 14px; 
     }
     
     .question { 
-        margin-bottom: 16px; 
+        margin-bottom: """ + QUESTION_MARGIN_BOTTOM + """; 
         display: flex; 
-        gap: 8px; 
+        gap: """ + QUESTION_FLEX_GAP + """; 
         page-break-inside: avoid;
     }
     
@@ -205,13 +232,13 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     
     .q-text { 
         font-size: 15px; 
-        color: #1f2937; /* gray-800 */
+        color: #1f2937;
     }
     
     .q-marks { 
         font-weight: 600; 
         font-size: 13px; 
-        color: #6b7280; /* gray-500 */
+        color: #6b7280;
         white-space: nowrap; 
         margin-left: 8px; 
     }
@@ -219,8 +246,8 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     .options-grid { 
         display: grid; 
         grid-template-columns: repeat(2, 1fr); 
-        gap: 8px 16px; 
-        margin-top: 8px; 
+        gap: """ + OPTIONS_GAP_Y + " " + OPTIONS_GAP_X + """; 
+        margin-top: """ + OPTIONS_MARGIN_TOP + """; 
     }
     
     .option { 
@@ -231,11 +258,11 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     
     .opt-label { 
         font-weight: 600; 
-        color: #1f2937; /* gray-800 */
+        color: #1f2937;
     }
     
     .answer-container {
-        margin-top: 12px;
+        margin-top: """ + ANSWER_MARGIN_BOTTOM + """;
         display: flex;
         gap: 4px;
     }
@@ -246,7 +273,7 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     }
     
     .explanation-container {
-        margin-top: 4px;
+        margin-top: """ + ANSWER_EXPLANATION_MARGIN_TOP + """;
         font-size: 15px;
     }
     
