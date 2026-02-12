@@ -51,6 +51,11 @@ async def download_docx(
     logo_url = data["logo_url"]
     images_map = data["images_map"]
 
+    # Get toggle values from draft (default to True for backward compatibility)
+    show_logo = draft.get('is_show_logo', True)
+    show_instructions = draft.get('is_show_instruction', True)
+    show_explanation = draft.get('is_show_explanation_answer_key', True)
+
     latex_regex = r"(\$\$.*?\$\$|\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\])"
 
     def set_table_no_border(table):
@@ -192,7 +197,7 @@ async def download_docx(
         font.size = Pt(12)
 
         # Header Section ... (rest remains similar but using add_text_with_math)
-        if logo_url:
+        if show_logo and logo_url:
             try:
                 response = requests.get(logo_url)
                 if response.status_code == 200:
@@ -241,7 +246,7 @@ async def download_docx(
         add_horizontal_rule(hr_p)
 
         # Instructions
-        if download_req.mode == "paper" and instructions:
+        if download_req.mode == "paper" and show_instructions and instructions:
             doc.add_paragraph("General Instructions:").runs[0].bold = True
             for inst in instructions:
                 p = doc.add_paragraph(style='List Number')
@@ -357,7 +362,7 @@ async def download_docx(
                     ans_p.add_run("Ans: ").bold = True
                     add_text_with_math(ans_p, str(q.get("answer_text") or "N/A"), f"Q{idx + 1}-Ans")
                     
-                    if q.get("explanation"):
+                    if show_explanation and q.get("explanation"):
                         exp_p = doc.add_paragraph()
                         exp_p.add_run("Explanation: ").bold = True
                         add_text_with_math(exp_p, str(q["explanation"]), f"Q{idx + 1}-Expl")

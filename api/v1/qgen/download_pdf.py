@@ -97,6 +97,11 @@ async def download_pdf(
         raise HTTPException(status_code=500, detail="Failed to generate PDF") from e
 
 def generate_paper_html(draft, sections, questions, instructions, logo_url, mode, images_map=None):
+    # Get toggle values from draft (default to True for backward compatibility)
+    show_logo = draft.get('is_show_logo', True)
+    show_instructions = draft.get('is_show_instruction', True)
+    show_explanation = draft.get('is_show_explanation_answer_key', True)
+    
     # CSS for the paper - Values from paper_layout_config.py (synced with frontend index.css)
     css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -342,7 +347,7 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     <body>
         <div class="page">
             <div class="header">
-                {f'<img src="{logo_url}" class="logo">' if logo_url else ''}
+                {f'<img src="{logo_url}" class="logo">' if show_logo and logo_url else ''}
                 <div class="institute-name">{draft.get('institute_name') or 'Institute Name'}</div>
                 <div class="paper-title">{draft.get('paper_title') or 'Examination Paper'}{" - Answer Key" if mode == "answer" else ""}</div>
                 
@@ -365,9 +370,9 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
                     {''.join(f"<li>{inst.get('instruction_text')}</li>" for inst in instructions)}
                 </ol>
             </div>
-            ''' if mode == "paper" and instructions else ""}
+            ''' if mode == "paper" and show_instructions and instructions else ""}
 
-            {"".join(render_section(s, questions, mode, images_map) for s in sections)}
+            {"".join(render_section(s, questions, mode, images_map, show_explanation) for s in sections)}
         </div>
         {katex_script}
     </body>
@@ -375,7 +380,7 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     """
     return html
 
-def render_section(section, all_questions, mode, images_map=None):
+def render_section(section, all_questions, mode, images_map=None, show_explanation=True):
     section_questions = sorted(
         [q for q in all_questions if q["qgen_draft_section_id"] == section["id"]],
         key=lambda q: q.get("position_in_draft", 0)
@@ -391,12 +396,12 @@ def render_section(section, all_questions, mode, images_map=None):
             <span class="section-name">{section.get('section_name')}</span>
             <span class="section-marks">[{total_marks}]</span>
         </div>
-        {"".join(render_question(q, idx + 1, mode, images_map.get(q["id"], []) if images_map else []) for idx, q in enumerate(section_questions))}
+        {"".join(render_question(q, idx + 1, mode, images_map.get(q["id"], []) if images_map else [], show_explanation) for idx, q in enumerate(section_questions))}
     </div>
     """
     return html
 
-def render_question(q, display_idx, mode, images=None):
+def render_question(q, display_idx, mode, images=None, show_explanation=True):
     is_mcq = q.get("question_type") in ["mcq4", "msq4"]
     
     # Images rendering
@@ -445,11 +450,14 @@ def render_question(q, display_idx, mode, images=None):
     answer_html = ""
     if mode == "answer":
         answer_text = q.get("answer_text") or "N/A"
+        explanation_html = ""
+        if show_explanation and q.get("explanation"):
+            explanation_html = f'<div class="explanation-container"><span class="exp-label">Explanation:</span><span class="q-text">{q["explanation"]}</span></div>'
         answer_html = f'''
         <div class="answer-container">
             <span class="ans-label">Ans:</span> <span class="q-text">{answer_text}</span>
         </div>
-        {f'<div class="explanation-container"><span class="exp-label">Explanation:</span><span class="q-text">{q["explanation"]}</span></div>' if q.get("explanation") else ""}
+        {explanation_html}
         '''
 
     # Break logic
