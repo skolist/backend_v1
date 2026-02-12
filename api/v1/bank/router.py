@@ -277,9 +277,10 @@ async def preview_regenerate(
 
     try:
         # Reuse regenerate logic
-        # process_question_and_validate uses the prompt generator internally which reads CustomInstruction or prompt
-        # If we want to support custom prompt, we might need to inject it into the question payload
-        # or use a lower level function.
+        # process_question_and_validate uses the prompt generator internally
+        # which reads CustomInstruction or prompt
+        # If we want to support custom prompt, we might need to inject it
+        # into the question payload or use a lower level function.
         # regenerate_question_prompt uses 'custom_instructions' from the dict if present.
 
         q_data = request.question.copy()

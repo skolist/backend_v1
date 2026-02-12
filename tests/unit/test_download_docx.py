@@ -192,8 +192,10 @@ def test_download_docx_rollback_on_math_failure(test_app):
                 mock_add_math.assert_called()
 
                 # Check that simple text fallback occurred
-                # The fallback would call paragraph.add_run(part) where part is the latex string
-                # Note: add_text_with_math will split "Math: $\cos\theta$" into ["Math: ", "$\cos\theta$", ""]
+                # The fallback would call paragraph.add_run(part)
+                # where part is the latex string.
+                # Note: add_text_with_math will split "Math: $\cos\theta$"
+                # into ["Math: ", "$\cos\theta$", ""]
                 # So we expect add_run to be called with the latex part.
 
                 # Filter calls to find the one with our latex

@@ -146,8 +146,10 @@ class TestRegenerateWithPromptService:
 
             assert success is True
 
-            # Verify browser/screenshot called - wait, if we mock generate_screenshot, mock_browser usage depends on implementation
-            # calling mock_screenshot means we don't necessarily call mock_browser inside it if passing mock.
+            # Verify browser/screenshot called - wait, if we mock
+            # generate_screenshot, mock_browser usage depends on implementation
+            # calling mock_screenshot means we don't necessarily call
+            # mock_browser inside it if passing mock.
             # But the service passes browser to generate_screenshot.
             mock_screenshot.assert_called_once()
             mock_save.assert_called()

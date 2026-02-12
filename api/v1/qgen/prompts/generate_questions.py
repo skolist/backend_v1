@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 Prompt template for generating questions with granular concept association.
 """

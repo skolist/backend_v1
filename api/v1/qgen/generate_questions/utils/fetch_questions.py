@@ -32,9 +32,14 @@ def extract_bank_question_to_gen_payload(
         "explanation": bank_question.get("explanation"),
         "marks": bank_question.get("marks"),
         "hardness_level": bank_question.get("hardness_level"),
-        "question_type": bank_question.get("question_type"),  # We keep the original type (MCQ, etc)
-        # "question_type": "SOLVED_EXAMPLE" if request_type == QuestionRequestType.SOLVED_EXAMPLE else "EXERCISE", # Logic discussed: keep original type or use new Enum?
-        # User requested: "the question will still have the type mcq or msq etc. after this using the bank_question table's type attribute , but I will add two more field in db to the gen_questions table is_solved_example and is_exercise_question"
+        # We keep the original type (MCQ, etc)
+        "question_type": bank_question.get("question_type"),
+        # "question_type": "SOLVED_EXAMPLE" if ... else "EXERCISE"
+        # Logic discussed: keep original type or use new Enum?
+        # User requested: "the question will still have the type mcq or msq
+        # etc. after this using the bank_question table's type attribute,
+        # but I will add two more field in db to the gen_questions table
+        # is_solved_example and is_exercise_question"
         # Options for MCQ/MSQ
         "option1": bank_question.get("option1"),
         "option2": bank_question.get("option2"),
@@ -47,20 +52,27 @@ def extract_bank_question_to_gen_payload(
         "msq_option3_answer": bank_question.get("msq_option3_answer"),
         "msq_option4_answer": bank_question.get("msq_option4_answer"),
         # Flags (The new columns)
-        "is_solved_example": True if request_type == QuestionRequestType.SOLVED_EXAMPLE else False,
-        "is_exercise_question": True
-        if request_type == QuestionRequestType.EXERCISE_QUESTION
-        else False,
+        "is_solved_example": (
+            True if request_type == QuestionRequestType.SOLVED_EXAMPLE else False
+        ),
+        "is_exercise_question": (
+            True if request_type == QuestionRequestType.EXERCISE_QUESTION else False
+        ),
         # Other fields
         "match_the_following_columns": bank_question.get(
             "match_columns"
         ),  # Note column mismatch handling
-        # svgs might handle differently if they are not in gen_questions directly but in gen_images
-        "svgs": [],  # We will handle SVGs separately if needed, but bank_questions has 'svgs' string column maybe?
-        # bank_questions has 'svgs' text column. gen_questions doesn't typically store it directly in column?
+        # svgs might handle differently if they are not in gen_questions
+        # directly but in gen_images
+        # We will handle SVGs separately if needed, but bank_questions
+        # has 'svgs' string column maybe?
+        "svgs": [],
+        # bank_questions has 'svgs' text column. gen_questions doesn't
+        # typically store it directly in column?
         # Wait, service.py handles 'svgs' list by popping it.
         # bank_questions schema: svgs text null.
-        # If bank_questions stores it as string, we might need to parse it if service expects a list of objects.
+        # If bank_questions stores it as string, we might need to parse it
+        # if service expects a list of objects.
         # But let's look at service.py: it pops "svgs" list.
     }
 
@@ -110,8 +122,9 @@ def fetch_questions_from_bank(
     # Helper to run query
     def run_query(target_diff: str | None = None):
         # We need to join with bank_questions_concepts_maps to filter by concept
-        # Supabase-py doesn't support complex joins easily for filtering in one go without raw sql or views usually,
-        # but we can try filtering on the foreign key if set up, or use the mapping table.
+        # Supabase-py doesn't support complex joins easily for filtering
+        # in one go without raw sql or views usually, but we can try
+        # filtering on the foreign key if set up, or use the mapping table.
 
         # Strategy: Get valid bank_question_ids from mapping table first for these concepts
         # Then fetch questions.
@@ -161,7 +174,8 @@ def fetch_questions_from_bank(
     # Attempt 2: Relax difficulty if needed
     if len(questions) < count:
         logger.info(
-            f"Not enough {request_type.value} questions with difficulty {difficulty}. Found {len(questions)}. Relaxing difficulty."
+            f"Not enough {request_type.value} questions with difficulty "
+            f"{difficulty}. Found {len(questions)}. Relaxing difficulty."
         )
         more_questions = run_query(None)  # Fetch all for these concepts + flag
         logger.info(f"Number of the more_questions is : {len(more_questions)}")
@@ -179,11 +193,14 @@ def fetch_questions_from_bank(
     formatted_questions = []
 
     for q in questions:
-        # We need to preserve concept_ids for the insertion logic which uses 'concept_ids' key
-        # q['bank_questions_concepts_maps'] will be a list of dicts like [{'concept_id': ...}, ...] due to select above
+        # We need to preserve concept_ids for the insertion logic
+        # which uses 'concept_ids' key.
+        # q['bank_questions_concepts_maps'] will be a list of dicts like
+        # [{'concept_id': ...}, ...] due to select above
         q_concept_ids = [m["concept_id"] for m in q.get("bank_questions_concepts_maps", [])]
 
-        # If join didn't return it (depends on RLS/relationships), use the batch concepts as fallback
+        # If join didn't return it (depends on RLS/relationships),
+        # use the batch concepts as fallback
         if not q_concept_ids:
             q_concept_ids = concept_ids
 

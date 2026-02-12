@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 COMMON_INSTRUCTIONS = """
     1] Latex should be always put inside $<content>$ blocks, don't forget
     2] For fill in the blanks etc. spaces should use $\\_\\_$ (contained in the $$) not some text{{__}} wrapper, also raw \\_\\_ won't work, we need $\\_\\_$

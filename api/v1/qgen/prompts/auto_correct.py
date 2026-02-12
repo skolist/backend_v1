@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 Prompt template for auto-correcting questions.
 """

@@ -57,12 +57,14 @@ async def generate_content_with_retries(
             attempt += 1
             if attempt >= retries:
                 logger.error(
-                    f"Gemini generate_content failed after {retries} retries for endpoint {api_endpoint}: {e}",
+                    f"Gemini generate_content failed after {retries} retries "
+                    f"for endpoint {api_endpoint}: {e}",
                     exc_info=True,
                 )
                 raise last_exc from e
             logger.warning(
-                f"Gemini call failed (attempt {attempt}/{retries}) for endpoint {api_endpoint}: {e}. Retrying in {delay}s."
+                f"Gemini call failed (attempt {attempt}/{retries}) "
+                f"for endpoint {api_endpoint}: {e}. Retrying in {delay}s."
             )
             await asyncio.sleep(delay)
             delay = min(delay * 2, 16.0)

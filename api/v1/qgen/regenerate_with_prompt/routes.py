@@ -31,7 +31,8 @@ async def regenerate_question_with_prompt(
     user: dict = Depends(require_supabase_user),
 ):
     """
-    API endpoint to regenerate a question with a custom prompt, files, and auto-generated screenshot.
+    API endpoint to regenerate a question with a custom prompt, files,
+    and auto-generated screenshot.
     """
     user_id = user.id
 

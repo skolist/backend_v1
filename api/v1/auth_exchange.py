@@ -34,7 +34,8 @@ try:
                 # Treat as file path
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
                 logger.info(
-                    f"Initializing Firebase Admin with certificate file: {settings.FIREBASE_CREDENTIALS}"
+                    "Initializing Firebase Admin with certificate file: "
+                    f"{settings.FIREBASE_CREDENTIALS}"
                 )
 
             if cred:

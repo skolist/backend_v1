@@ -230,7 +230,8 @@ class ExtractedQuestion(BaseModel):
     """Single extracted question with type discriminator for mixed-type extraction."""
 
     question_type: str = Field(
-        description="Question type: mcq4, msq4, fill_in_the_blank, true_false, short_answer, long_answer, match_the_following"
+        description="Question type: mcq4, msq4, fill_in_the_blank, "
+        "true_false, short_answer, long_answer, match_the_following"
     )
     question_text: str = Field(description="The question text")
     # MCQ4/MSQ4 options

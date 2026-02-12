@@ -157,16 +157,24 @@ async def get_feedback(
         # Format questions for better readability
         questions_details = []
         for idx, question in enumerate(questions, 1):
+            q_text = question.get("question_text", "N/A")[:200]
+            q_text_ellipsis = "..." if len(question.get("question_text", "")) > 200 else ""
+            a_text = question.get("answer_text", "N/A")[:100]
+            a_text_ellipsis = "..." if len(question.get("answer_text", "")) > 100 else ""
             q_detail = f"""Question {idx}:
 - Type: {question.get("question_type", "N/A")}
 - Difficulty: {question.get("hardness_level", "N/A")}
 - Marks: {question.get("marks", "N/A")}
-- Question Text: {question.get("question_text", "N/A")[:200]}{"..." if len(question.get("question_text", "")) > 200 else ""}
-- Answer: {question.get("answer_text", "N/A")[:100]}{"..." if len(question.get("answer_text", "")) > 100 else ""}"""
+- Question Text: {q_text}{q_text_ellipsis}
+- Answer: {a_text}{a_text_ellipsis}"""
 
             # Add MCQ options if present
             if question.get("question_type") == "mcq4" and question.get("option1"):
-                q_detail += f"\n- Options: {question.get('option1', '')[:50]}, {question.get('option2', '')[:50]}, {question.get('option3', '')[:50]}, {question.get('option4', '')[:50]}"
+                opt1 = question.get("option1", "")[:50]
+                opt2 = question.get("option2", "")[:50]
+                opt3 = question.get("option3", "")[:50]
+                opt4 = question.get("option4", "")[:50]
+                q_detail += f"\n- Options: {opt1}, {opt2}, {opt3}, {opt4}"
             elif question.get("question_type") == "match_the_following" and question.get(
                 "match_the_following_columns"
             ):

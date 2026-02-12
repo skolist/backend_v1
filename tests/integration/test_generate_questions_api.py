@@ -783,7 +783,9 @@ class TestGenerateQuestionsWithInstructions:
                     "question_types": [{"type": "mcq4", "count": 1}],
                     "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
                 },
-                "instructions": "Use LaTeX format: $E = mc^2$, include formulas like \\frac{1}{2}mv^2",
+                "instructions": (
+                    "Use LaTeX format: $E = mc^2$, " "include formulas like \\frac{1}{2}mv^2"
+                ),
             },
         )
 

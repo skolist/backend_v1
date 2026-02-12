@@ -45,7 +45,8 @@ class TestCheckUserHasCredits:
         # Chain for select().eq().single().execute()
         mock_response = MagicMock()
         mock_response.data = {"credits": 1000}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_response
 
         result = check_user_has_credits(user_id)
 
@@ -60,7 +61,8 @@ class TestCheckUserHasCredits:
 
         mock_response = MagicMock()
         mock_response.data = {"credits": 0}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_response
 
         result = check_user_has_credits(user_id)
 
@@ -74,7 +76,8 @@ class TestCheckUserHasCredits:
 
         mock_response = MagicMock()
         mock_response.data = {"credits": -10}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_response
 
         result = check_user_has_credits(user_id)
 
@@ -88,7 +91,8 @@ class TestCheckUserHasCredits:
 
         mock_response = MagicMock()
         mock_response.data = {"credits": 1}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_response
 
         result = check_user_has_credits(user_id)
 
@@ -112,7 +116,8 @@ class TestDeductUserCredits:
         # Mock fetch response with 1000 credits
         mock_fetch_response = MagicMock()
         mock_fetch_response.data = {"credits": 1000}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
 
         deduct_user_credits(user_id, 100)
 
@@ -128,7 +133,8 @@ class TestDeductUserCredits:
         # Mock fetch response with 5 credits
         mock_fetch_response = MagicMock()
         mock_fetch_response.data = {"credits": 5}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
 
         # Deduct more than available
         deduct_user_credits(user_id, 10)
@@ -144,7 +150,8 @@ class TestDeductUserCredits:
 
         mock_fetch_response = MagicMock()
         mock_fetch_response.data = {"credits": 50}
-        mock_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
+        mock_chain = mock_client.table.return_value.select.return_value
+        mock_chain.eq.return_value.single.return_value.execute.return_value = mock_fetch_response
 
         deduct_user_credits(user_id, 50)
 

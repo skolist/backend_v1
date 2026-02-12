@@ -95,15 +95,22 @@ class RegenerateWithPromptService:
         # We should create/use a shared model or just define schema inline if simple wrapper.
         # Let's check models.py again.
         # Ideally we should use the same pattern as AutoCorrectedQuestion.
-        # I will reuse AutoCorrectedQuestion if it fits (question: AllQuestions) or create a NEW one in models.py if needed.
-        # RegeneratedQuestionWithPrompt had `question: AllQuestions`. Exact same structure.
-        # So I will reuse AutoCorrectedQuestion or better, alias/create generic wrapper.
-        # For now, to be consistent with previous code, let's use the same wrapper structure.
-        # I will assume we can reuse AutoCorrectedQuestion or I'll just use the same Schema inline.
-        # Actually, let's just use AutoCorrectedQuestion for now as it is generic "question wrapper",
-        # OR add RegeneratedQuestion to models.py.
-        # To be clean, I will use AutoCorrectedQuestion but maybe rename it later to "QuestionResponse" to be generic.
-        # For this refactor, I will reuse models.AutoCorrectedQuestion as the schema structure is identical.
+        # I will reuse AutoCorrectedQuestion if it fits (question: AllQuestions)
+        # or create a NEW one in models.py if needed.
+        # RegeneratedQuestionWithPrompt had `question: AllQuestions`.
+        # Exact same structure.
+        # So I will reuse AutoCorrectedQuestion or better,
+        # alias/create generic wrapper.
+        # For now, to be consistent with previous code, let's use the same
+        # wrapper structure.
+        # I will assume we can reuse AutoCorrectedQuestion or I'll just use
+        # the same Schema inline.
+        # Actually, let's just use AutoCorrectedQuestion for now as it is
+        # generic "question wrapper", OR add RegeneratedQuestion to models.py.
+        # To be clean, I will use AutoCorrectedQuestion but maybe rename it
+        # later to "QuestionResponse" to be generic.
+        # For this refactor, I will reuse models.AutoCorrectedQuestion as the
+        # schema structure is identical.
 
         from api.v1.qgen.models import AutoCorrectedQuestion
 
@@ -193,10 +200,12 @@ class RegenerateWithPromptService:
                 # 4. Update DB
                 update_data = regenerated_question.model_dump(exclude_none=True)
 
-                # Extract SVGs before updating gen_questions (svgs is not a column in gen_questions)
+                # Extract SVGs before updating gen_questions
+                # (svgs is not a column in gen_questions)
                 svg_list = update_data.pop("svgs", None)
 
-                # Map 'columns' to 'match_the_following_columns' if it exists (for match_the_following type)
+                # Map 'columns' to 'match_the_following_columns' if it exists
+                # (for match_the_following type)
                 if "columns" in update_data:
                     cols = update_data.pop("columns")
                     if isinstance(cols, list):
@@ -220,7 +229,8 @@ class RegenerateWithPromptService:
                 # Insert SVGs into gen_images table if present
                 if svg_list:
                     logger.debug(
-                        f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found"
+                        f"SVGs generated for question {gen_question_id}: "
+                        f"{len(svg_list)} SVG(s) found"
                     )
 
                     # First, delete existing SVGs for this question (to replace with new ones)

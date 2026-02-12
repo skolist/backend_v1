@@ -564,14 +564,19 @@ def test_concepts(
         {
             "id": concept_ids[0],
             "name": "Newton's Laws of Motion",
-            "description": "The three fundamental laws describing the relationship between forces and motion.",
+            "description": (
+                "The three fundamental laws describing "
+                "the relationship between forces and motion."
+            ),
             "topic_id": test_topic_id,
             "page_number": 1,
         },
         {
             "id": concept_ids[1],
             "name": "Kinetic Energy",
-            "description": "Energy possessed by an object due to its motion. Formula: KE = 1/2 * m * v^2.",
+            "description": (
+                "Energy possessed by an object due to its motion. " "Formula: KE = 1/2 * m * v^2."
+            ),
             "topic_id": test_topic_id,
             "page_number": 2,
         },

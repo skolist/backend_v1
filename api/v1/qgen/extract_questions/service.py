@@ -315,7 +315,8 @@ class ExtractQuestionsService:
                 continue
 
         logger.info(
-            f"Extraction complete: {len(inserted_questions)} questions inserted into section {section_id}"
+            f"Extraction complete: {len(inserted_questions)} questions "
+            f"inserted into section {section_id}"
         )
 
         return {

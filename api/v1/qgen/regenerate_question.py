@@ -268,10 +268,12 @@ async def try_retry_and_update(
             # Update the question in the database
             update_data = regenerated_question.model_dump(exclude_none=True)
 
-            # Extract SVGs before updating gen_questions (svgs is not a column in gen_questions)
+            # Extract SVGs before updating gen_questions
+            # (svgs is not a column in gen_questions)
             svg_list = update_data.pop("svgs", None)
 
-            # Map 'columns' to 'match_the_following_columns' if it exists (for match_the_following type)
+            # Map 'columns' to 'match_the_following_columns' if it exists
+            # (for match_the_following type)
             if "columns" in update_data:
                 cols = update_data.pop("columns")
                 if isinstance(cols, list):

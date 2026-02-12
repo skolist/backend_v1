@@ -27,7 +27,9 @@ def format_duration(d_time: time | None) -> str:
 
 async def fetch_paper_data(draft_id: str, supabase_client: supabase.Client):
     """
-    Fetches all data required to generate a paper (Draft, Sections, Questions, Instructions, Images).
+    Fetches all data required to generate a paper.
+
+    Includes Draft, Sections, Questions, Instructions, Images.
     """
     try:
         # 1. Fetch Draft Data

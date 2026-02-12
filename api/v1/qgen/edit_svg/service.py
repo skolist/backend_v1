@@ -14,7 +14,8 @@ class SVGEditError(Exception):
 
 def edit_svg_prompt(svg_string: str, instruction: str) -> str:
     """Generate prompt for editing SVG based on natural language instruction."""
-    return f"""You are an SVG editor assistant. Your task is to modify the given SVG based on the user's instruction.
+    return f"""You are an SVG editor assistant. Your task is to modify the \
+given SVG based on the user's instruction.
 
 ## Current SVG:
 ```svg

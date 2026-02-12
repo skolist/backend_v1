@@ -157,14 +157,26 @@ async def generate_screenshot(question: dict[str, Any], browser_service) -> byte
             max_rows = max(len(left_col), len(right_col))
 
             options_html = '<table class="match-table">'
-            options_html += f'<tr><th style="text-align:left">{col_names[0]}</th><th style="text-align:left">{col_names[1]}</th></tr>'
+            header_row = (
+                f'<tr><th style="text-align:left">{col_names[0]}</th>'
+                f'<th style="text-align:left">{col_names[1]}</th></tr>'
+            )
+            options_html += header_row
             for i in range(max_rows):
                 left_item = left_col[i] if i < len(left_col) else ""
                 right_item = right_col[i] if i < len(right_col) else ""
 
                 options_html += "<tr>"
-                options_html += f'<td><div class="match-item"><span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
-                options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65 + i)}.</span> {right_item}</div></td>'
+                options_html += (
+                    f'<td><div class="match-item">'
+                    f'<span class="match-prefix">{i + 1}.</span> '
+                    f"{left_item}</div></td>"
+                )
+                options_html += (
+                    f'<td><div class="match-item">'
+                    f'<span class="match-prefix">{chr(65 + i)}.</span> '
+                    f"{right_item}</div></td>"
+                )
                 options_html += "</tr>"
             options_html += "</table>"
 

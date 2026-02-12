@@ -58,7 +58,9 @@ DUMMY_QUESTIONS = [
         "id": "q-2",
         "qgen_draft_section_id": "sec-1",
         "position_in_draft": 2,
-        "question_text": "Identify the logic gate represented by the symbol below and explain its function.",
+        "question_text": (
+            "Identify the logic gate represented by the symbol below " "and explain its function."
+        ),
         "marks": 5,
         "question_type": "short_answer",
         "answer_text": "The symbol represents an AND gate.",
@@ -85,7 +87,13 @@ DUMMY_QUESTIONS = [
 DUMMY_IMAGES = {
     "q-2": [
         {
-            "svg_string": '<svg width="100" height="50"><rect width="100" height="50" style="fill:rgb(0,0,255);stroke-width:3;stroke:rgb(0,0,0)" /><text x="25" y="30" fill="white">AND GATE</text></svg>',
+            "svg_string": (
+                '<svg width="100" height="50">'
+                '<rect width="100" height="50" '
+                'style="fill:rgb(0,0,255);stroke-width:3;stroke:rgb(0,0,0)" />'
+                '<text x="25" y="30" fill="white">AND GATE</text>'
+                "</svg>"
+            ),
             "position": 1,
             "gen_question_id": "q-2",
         },

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 Prompt template for extracting questions from files (images/PDFs).
 """

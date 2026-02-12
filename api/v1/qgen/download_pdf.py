@@ -451,7 +451,13 @@ def render_section(section, all_questions, mode, images_map=None, show_explanati
             <span class="section-name">{section.get("section_name")}</span>
             <span class="section-marks">[{total_marks}]</span>
         </div>
-        {"".join(render_question(q, idx + 1, mode, images_map.get(q["id"], []) if images_map else [], show_explanation) for idx, q in enumerate(section_questions))}
+        {"".join(
+            render_question(
+                q, idx + 1, mode,
+                images_map.get(q["id"], []) if images_map else [],
+                show_explanation
+            ) for idx, q in enumerate(section_questions)
+        )}
     </div>
     """
     return html
@@ -480,7 +486,10 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
             labels = ["a)", "b)", "c)", "d)"]
             for i, opt in enumerate(options):
                 if opt:
-                    options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
+                    options_html += (
+                        f'<div class="option">'
+                        f'<span class="opt-label">{labels[i]}</span> {opt}</div>'
+                    )
             options_html += "</div>"
         elif q.get("question_type") == "match_the_following":
             cols = q.get("match_the_following_columns") or {}
@@ -491,14 +500,23 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
                 max_rows = max(len(left_col), len(right_col))
 
                 options_html = '<table class="match-table">'
-                options_html += f'<tr><th style="text-align:left">{col_names[0]}</th><th style="text-align:left">{col_names[1]}</th></tr>'
+                options_html += (
+                    f'<tr><th style="text-align:left">{col_names[0]}</th>'
+                    f'<th style="text-align:left">{col_names[1]}</th></tr>'
+                )
                 for i in range(max_rows):
                     left_item = left_col[i] if i < len(left_col) else ""
                     right_item = right_col[i] if i < len(right_col) else ""
 
                     options_html += "<tr>"
-                    options_html += f'<td><div class="match-item"><span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
-                    options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65 + i)}.</span> {right_item}</div></td>'
+                    options_html += (
+                        f'<td><div class="match-item">'
+                        f'<span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
+                    )
+                    options_html += (
+                        f'<td><div class="match-item">'
+                        f'<span class="match-prefix">{chr(65 + i)}.</span> {right_item}</div></td>'
+                    )
                     options_html += "</tr>"
                 options_html += "</table>"
 
@@ -508,7 +526,11 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
         answer_text = q.get("answer_text") or "N/A"
         explanation_html = ""
         if show_explanation and q.get("explanation"):
-            explanation_html = f'<div class="explanation-container"><span class="exp-label">Explanation:</span><span class="q-text">{q["explanation"]}</span></div>'
+            explanation_html = (
+                '<div class="explanation-container">'
+                '<span class="exp-label">Explanation:</span>'
+                f'<span class="q-text">{q["explanation"]}</span></div>'
+            )
         answer_html = f"""
         <div class="answer-container">
             <span class="ans-label">Ans:</span> <span class="q-text">{answer_text}</span>

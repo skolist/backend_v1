@@ -90,11 +90,12 @@ async def download_docx(
         bottom.set(qn("w:color"), "auto")
         pBdr.append(bottom)
 
-        # Ensure pBdr is inserted before alignment (jc) or other spacing elements if they exist
-        # to respect some schema strictness, though mostly for jc.
+        # Ensure pBdr is inserted before alignment (jc) or other spacing elements
+        # if they exist to respect some schema strictness, though mostly for jc.
         # Ideally pBdr is early in pPr.
         # Find first element that should come AFTER pBdr?
-        # Schema: pStyle, keepNext, keepLines, pageBreakBefore, framePr, widowControl, numPr, suppressLineNumbers, pBdr
+        # Schema: pStyle, keepNext, keepLines, pageBreakBefore, framePr,
+        #         widowControl, numPr, suppressLineNumbers, pBdr
         # So we append, unless we see something that must be after.
         # But simply appending usually works for 'jc' if 'jc' isn't set yet.
         # If we set alignment later, python-docx handles it?
@@ -151,7 +152,10 @@ async def download_docx(
                 try:
                     # Capture state before attempt
                     initial_msg_count = len(paragraph._p)
-                    # logger.info(f"DEBUG: Before math '{clean_latex[:20]}', children: {initial_msg_count}")
+                    # logger.info(
+                    #     f"DEBUG: Before math '{clean_latex[:20]}', "
+                    #     f"children: {initial_msg_count}"
+                    # )
 
                     math2docx.add_math(paragraph, clean_latex)
 
@@ -161,7 +165,10 @@ async def download_docx(
 
                     # Rollback
                     current_msg_count = len(paragraph._p)
-                    # logger.debug(f"DEBUG: Rollback triggered. Initial: {initial_msg_count}, Current: {current_msg_count}")
+                    # logger.debug(
+                    #     f"DEBUG: Rollback triggered. Initial: {initial_msg_count}, "
+                    #     f"Current: {current_msg_count}"
+                    # )
 
                     if current_msg_count > initial_msg_count:
                         diff = current_msg_count - initial_msg_count

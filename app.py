@@ -64,7 +64,8 @@ def create_app() -> FastAPI:
     elif DEPLOYMENT_ENV == "STAGE":
         app.add_middleware(
             CORSMiddleware,
-            allow_origin_regex=r"https://.*\.skolist\.com|https://.*\.vercel\.app",  # Vercel Preview mode
+            # Vercel Preview mode
+            allow_origin_regex=(r"https://.*\.skolist\.com|https://.*\.vercel\.app"),
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

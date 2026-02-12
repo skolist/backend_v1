@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 Prompt template for regenerating questions with custom prompt.
 """

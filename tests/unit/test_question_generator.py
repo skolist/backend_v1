@@ -59,12 +59,17 @@ def mock_concepts() -> list[dict[str, str]]:
         {
             "id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "Newton's Laws of Motion",
-            "description": "The three fundamental laws that describe the relationship between forces and motion.",
+            "description": (
+                "The three fundamental laws that describe "
+                "the relationship between forces and motion."
+            ),
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440002",
             "name": "Kinetic Energy",
-            "description": "Energy possessed by an object due to its motion. Formula: KE = 1/2 * m * v^2.",
+            "description": (
+                "Energy possessed by an object due to its motion. " "Formula: KE = 1/2 * m * v^2."
+            ),
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440003",
