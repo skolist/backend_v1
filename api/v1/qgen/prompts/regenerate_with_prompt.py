@@ -2,14 +2,13 @@
 Prompt template for regenerating questions with custom prompt.
 """
 
-from typing import Optional
-
 from .common_instructions import COMMON_INSTRUCTIONS
 from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
+
 def regenerate_question_with_prompt_prompt(
     gen_question: dict,
-    custom_prompt: Optional[str] = None,
+    custom_prompt: str | None = None,
 ) -> str:
     """
     Generate prompt to regenerate a question with optional custom instructions.
@@ -32,7 +31,7 @@ A screenshot of the current question is attached for reference if you need to un
 The user has provided the following instructions for regenerating this question:
 {custom_prompt}
 
-Please regenerate the question according to these instructions while maintaining the same format and structure. 
+Please regenerate the question according to these instructions while maintaining the same format and structure.
 If files are attached, use the content from those files to inform your regeneration.
 Return the regenerated question in the same format as the original.
 Common Latex Errors:

@@ -3,37 +3,40 @@ Exposes the function to create the FastAPI application instance. To be used by m
 """
 
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from playwright.async_api import async_playwright
 
 # Initialize logging configuration (must be imported before other modules)
 from config.logger import setup_logging
+
 setup_logging()
 
-from config.settings import DEPLOYMENT_ENV
 from api.v1.router import router as v1_router
+from config.settings import DEPLOYMENT_ENV
 
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from services.browser_service import BrowserService
-    
+
     # Initialize BrowserService
     browser_service = BrowserService()
     await browser_service.start()
-    
+
     # Store in app state
     app.state.browser_service = browser_service
     # Keep app.state.browser for backward compatibility if needed, but optimally remove it
     # We remove it to force errors where code hasn't been migrated
-    
+
     yield
-    
+
     # Cleanup
     await browser_service.stop()
+
 
 def create_app() -> FastAPI:
     """

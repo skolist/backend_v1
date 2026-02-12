@@ -6,22 +6,21 @@ The --gemini-live option is defined in tests/conftest.py.
 """
 
 import os
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import MagicMock
 
+import google.genai as genai
 import pytest
 from dotenv import load_dotenv
-import google.genai as genai
 
-from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
-
+from api.v1.qgen.models import MCQ4, FillInTheBlank, ShortAnswer, TrueFalse
 
 # ============================================================================
 # MOCK RESPONSE FACTORIES
 # ============================================================================
 
 
-def create_mock_mcq4(question_text: Optional[str] = None) -> MCQ4:
+def create_mock_mcq4(question_text: str | None = None) -> MCQ4:
     """Create a mock MCQ4 question."""
     return MCQ4(
         question_text=question_text or "What is the formula for kinetic energy?",
@@ -34,7 +33,7 @@ def create_mock_mcq4(question_text: Optional[str] = None) -> MCQ4:
     )
 
 
-def create_mock_short_answer(question_text: Optional[str] = None) -> ShortAnswer:
+def create_mock_short_answer(question_text: str | None = None) -> ShortAnswer:
     """Create a mock ShortAnswer question."""
     return ShortAnswer(
         question_text=question_text or "Explain Newton's first law of motion.",
@@ -43,7 +42,7 @@ def create_mock_short_answer(question_text: Optional[str] = None) -> ShortAnswer
     )
 
 
-def create_mock_true_false(question_text: Optional[str] = None) -> TrueFalse:
+def create_mock_true_false(question_text: str | None = None) -> TrueFalse:
     """Create a mock TrueFalse question."""
     return TrueFalse(
         question_text=question_text or "Kinetic energy depends on velocity squared.",
@@ -52,11 +51,10 @@ def create_mock_true_false(question_text: Optional[str] = None) -> TrueFalse:
     )
 
 
-def create_mock_fill_in_blank(question_text: Optional[str] = None) -> FillInTheBlank:
+def create_mock_fill_in_blank(question_text: str | None = None) -> FillInTheBlank:
     """Create a mock FillInTheBlank question."""
     return FillInTheBlank(
-        question_text=question_text
-        or "The formula for kinetic energy is KE = 1/2 * m * ___",
+        question_text=question_text or "The formula for kinetic energy is KE = 1/2 * m * ___",
         answer_text="v^2",
         explanation="Velocity squared completes the kinetic energy formula.",
     )
@@ -113,17 +111,13 @@ class MockGeminiModels:
             if "short_answer" in contents_str:
 
                 class QuestionWrapper:
-                    question = create_mock_short_answer(
-                        "What is Newton's first law of motion?"
-                    )
+                    question = create_mock_short_answer("What is Newton's first law of motion?")
 
                 return MockParsedResponse(QuestionWrapper())
             else:
 
                 class QuestionWrapper:
-                    question = create_mock_mcq4(
-                        "What is the formula for kinetic energy?"
-                    )
+                    question = create_mock_mcq4("What is the formula for kinetic energy?")
 
                 return MockParsedResponse(QuestionWrapper())
 
@@ -150,11 +144,16 @@ class MockGeminiModels:
         # Handle feedback endpoint (returns FeedbackList with .feedbacks list)
         if "FeedbackList" in schema_name or "feedback" in contents_str:
             from api.v1.qgen.models import FeedbackItem, FeedbackList
-            
+
             feedback_list = FeedbackList(
                 feedbacks=[
-                    FeedbackItem(message="Consider adding more variety in question difficulty levels.", priority=7),
-                    FeedbackItem(message="Some questions could benefit from clearer wording.", priority=5),
+                    FeedbackItem(
+                        message="Consider adding more variety in question difficulty levels.",
+                        priority=7,
+                    ),
+                    FeedbackItem(
+                        message="Some questions could benefit from clearer wording.", priority=5
+                    ),
                 ]
             )
             return MockParsedResponse(feedback_list)

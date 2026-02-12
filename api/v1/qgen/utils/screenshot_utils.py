@@ -1,23 +1,24 @@
-
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 from config.settings import LOG_IMAGES
+
 IMAGES_LOG_DIR = Path(__file__).parent.parent.parent.parent.parent / "logs" / "images"
+
 
 class ScreenshotError(Exception):
     pass
+
 
 async def save_image_for_debug(
     image_content: bytes,
     gen_question_id: str,
     content_type: str = "image/png",
-) -> Optional[str]:
+) -> str | None:
     if not LOG_IMAGES or logger.level > logging.DEBUG:
         return None
 
@@ -34,7 +35,8 @@ async def save_image_for_debug(
         logger.warning("Failed to save debug image", extra={"error": str(e)})
         return None
 
-async def generate_screenshot(question: Dict[str, Any], browser_service) -> bytes:
+
+async def generate_screenshot(question: dict[str, Any], browser_service) -> bytes:
     """
     Generate a screenshot of the question using Playwright via BrowserService.
     """
@@ -44,17 +46,17 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
     # CSS for the paper - Synchronized with PaperPreview.tsx
     css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    body { 
-        font-family: 'Inter', sans-serif; 
-        color: black; 
-        line-height: 1.5; 
-        padding: 20px; 
-        margin: 0; 
+
+    body {
+        font-family: 'Inter', sans-serif;
+        color: black;
+        line-height: 1.5;
+        padding: 20px;
+        margin: 0;
         background-color: white;
         width: 600px; /* Fixed width for consistent screenshot */
     }
-    
+
     .question-card {
         border: 1px solid #e2e8f0;
         border-radius: 8px;
@@ -62,53 +64,53 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
         background: white;
     }
 
-    .q-text { 
-        font-size: 15px; 
-        color: #1f2937; 
+    .q-text {
+        font-size: 15px;
+        color: #1f2937;
         font-weight: 500;
         margin-bottom: 8px;
     }
-    
-    .q-marks { 
-        font-weight: 600; 
-        font-size: 13px; 
-        color: #6b7280; 
-        margin-left: 8px; 
+
+    .q-marks {
+        font-weight: 600;
+        font-size: 13px;
+        color: #6b7280;
+        margin-left: 8px;
     }
-    
-    .options-grid { 
-        display: grid; 
-        grid-template-columns: repeat(2, 1fr); 
-        gap: 8px 16px; 
-        margin-top: 12px; 
+
+    .options-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 16px;
+        margin-top: 12px;
     }
-    
-    .option { 
-        display: flex; 
-        gap: 8px; 
-        font-size: 14px; 
+
+    .option {
+        display: flex;
+        gap: 8px;
+        font-size: 14px;
         color: #4b5563;
     }
-    
-    .opt-label { 
-        font-weight: 600; 
-        color: #1f2937; 
+
+    .opt-label {
+        font-weight: 600;
+        color: #1f2937;
     }
-    
+
     .images-container {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin: 8px 0;
     }
-    
-    .q-image { 
-        max-height: 200px; 
-        max-width: 100%; 
-        object-fit: contain; 
+
+    .q-image {
+        max-height: 200px;
+        max-width: 100%;
+        object-fit: contain;
         border-radius: 4px;
     }
-    
+
     .katex { font-size: 1.1em !important; }
     """
 
@@ -130,10 +132,10 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
 
     # Build HTML content
     images_html = ""
-    # Note: Using public URLs for images. If they are local blobs, this won't work directly 
-    # but the assumption is they are uploaded or accessible URLs. 
+    # Note: Using public URLs for images. If they are local blobs, this won't work directly
+    # but the assumption is they are uploaded or accessible URLs.
     # For now, we assume simple rendering text is enough context, or existing image URLs work.
-    
+
     # Construct Options
     options_html = ""
     if question.get("question_type") in ["mcq4", "msq4"]:
@@ -142,8 +144,10 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
         options_html = '<div class="options-grid">'
         for i, opt in enumerate(options):
             if opt:
-                options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
-        options_html += '</div>'
+                options_html += (
+                    f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
+                )
+        options_html += "</div>"
     elif question.get("question_type") == "match_the_following":
         cols = question.get("match_the_following_columns") or {}
         col_names = list(cols.keys())
@@ -151,19 +155,19 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
             left_col = cols[col_names[0]]
             right_col = cols[col_names[1]]
             max_rows = max(len(left_col), len(right_col))
-            
+
             options_html = '<table class="match-table">'
             options_html += f'<tr><th style="text-align:left">{col_names[0]}</th><th style="text-align:left">{col_names[1]}</th></tr>'
             for i in range(max_rows):
                 left_item = left_col[i] if i < len(left_col) else ""
                 right_item = right_col[i] if i < len(right_col) else ""
-                
-                options_html += '<tr>'
-                options_html += f'<td><div class="match-item"><span class="match-prefix">{i+1}.</span> {left_item}</div></td>'
-                options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65+i)}.</span> {right_item}</div></td>'
-                options_html += '</tr>'
-            options_html += '</table>'
-        
+
+                options_html += "<tr>"
+                options_html += f'<td><div class="match-item"><span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
+                options_html += f'<td><div class="match-item"><span class="match-prefix">{chr(65 + i)}.</span> {right_item}</div></td>'
+                options_html += "</tr>"
+            options_html += "</table>"
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -177,8 +181,8 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
     <body>
         <div class="question-card" id="card">
             <div style="display: flex; justify-content: space-between;">
-                <div class="q-text">{question.get('question_text', '')}</div>
-                <span class="q-marks">[{question.get('marks', 1)} marks]</span>
+                <div class="q-text">{question.get("question_text", "")}</div>
+                <span class="q-marks">[{question.get("marks", 1)} marks]</span>
             </div>
             {images_html}
             {options_html}
@@ -193,9 +197,9 @@ async def generate_screenshot(question: Dict[str, Any], browser_service) -> byte
             html_content=html_content,
             selector="body",
             screenshot_options={"type": "png"},
-            context_options={"device_scale_factor": 2}
+            context_options={"device_scale_factor": 2},
         )
         return screenshot_bytes
     except Exception as e:
         logger.error(f"Error taking screenshots: {e}")
-        raise ScreenshotError(f"Failed to generate screenshot: {e}")
+        raise ScreenshotError(f"Failed to generate screenshot: {e}") from e

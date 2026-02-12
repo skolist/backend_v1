@@ -11,7 +11,6 @@ import pytest
 
 from api.v1.qgen.credits import check_user_has_credits, deduct_user_credits
 
-
 # ============================================================================
 # FIXTURES
 # ============================================================================

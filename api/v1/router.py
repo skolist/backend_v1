@@ -7,11 +7,11 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from .auth import require_supabase_user
+from .auth_exchange import router as auth_exchange_router
+from .bank.router import router as bank_router
 from .qgen.router import router as qgen_router
 from .security import router as security_router
 from .sms_hook import router as sms_hook_router
-from .auth_exchange import router as auth_exchange_router
-from .bank.router import router as bank_router
 
 logger = logging.getLogger(__name__)
 

@@ -9,44 +9,41 @@ including the build_batches_end_to_end function and the new refactored architect
 """
 
 import uuid
-from typing import Dict, List
 from unittest.mock import MagicMock
 
-import pytest
 import google.genai as genai
+import pytest
 
-from api.v1.qgen.generate_questions.service import (
-    process_batch_generation,
-    process_batch_generation_and_validate,
-    try_retry_batch,
-    BatchProcessingContext,
-    BatchGenerationError,
-    BatchValidationError,
+from api.v1.qgen.generate_questions.batchification import (
+    Batch,
+    _chunk_questions,
+    _dedupe_preserve_order,
+    _expand_concepts_to_slots,
+    _largest_remainder_apportion,
+    _normalize_weights,
+    build_batches_end_to_end,
 )
 from api.v1.qgen.generate_questions.routes import (
-    extract_question_type_counts_dict,
-    extract_difficulty_percentages,
+    DifficultyDistribution,
     GenerateQuestionsRequest,
     QuestionConfig,
     QuestionTypeConfig,
-    DifficultyDistribution,
+    extract_difficulty_percentages,
+    extract_question_type_counts_dict,
 )
+from api.v1.qgen.generate_questions.service import (
+    BatchGenerationError,
+    BatchProcessingContext,
+    BatchValidationError,
+    process_batch_generation,
+    process_batch_generation_and_validate,
+    try_retry_batch,
+)
+from api.v1.qgen.models import QUESTION_TYPE_TO_ENUM
 from api.v1.qgen.prompts.generate_questions import (
     generate_questions_with_concepts_prompt as generate_questions_prompt,
 )
-from api.v1.qgen.models import QUESTION_TYPE_TO_ENUM
-
-from api.v1.qgen.generate_questions.batchification import (
-    build_batches_end_to_end,
-    Batch,
-    _dedupe_preserve_order,
-    _normalize_weights,
-    _chunk_questions,
-    _expand_concepts_to_slots,
-    _largest_remainder_apportion,
-)
 from supabase_dir import PublicHardnessLevelEnumEnum
-
 
 # ============================================================================
 # FIXTURES
@@ -54,7 +51,7 @@ from supabase_dir import PublicHardnessLevelEnumEnum
 
 
 @pytest.fixture
-def mock_concepts() -> List[Dict[str, str]]:
+def mock_concepts() -> list[dict[str, str]]:
     """
     Mock concept data matching the expected structure from Supabase.
     """
@@ -78,19 +75,19 @@ def mock_concepts() -> List[Dict[str, str]]:
 
 
 @pytest.fixture
-def mock_concepts_dict(mock_concepts: List[Dict[str, str]]) -> Dict[str, str]:
+def mock_concepts_dict(mock_concepts: list[dict[str, str]]) -> dict[str, str]:
     """Create concept name to description mapping."""
     return {concept["name"]: concept["description"] for concept in mock_concepts}
 
 
 @pytest.fixture
-def mock_concepts_name_to_id(mock_concepts: List[Dict[str, str]]) -> Dict[str, str]:
+def mock_concepts_name_to_id(mock_concepts: list[dict[str, str]]) -> dict[str, str]:
     """Create concept name to ID mapping."""
     return {concept["name"]: concept["id"] for concept in mock_concepts}
 
 
 @pytest.fixture
-def mock_old_questions() -> List[dict]:
+def mock_old_questions() -> list[dict]:
     """Mock historical questions from bank_questions table."""
     return [
         {
@@ -197,9 +194,7 @@ class TestExpandConceptsToSlots:
 
         rng = random.Random(42)
         concepts = ["a", "b"]
-        result = _expand_concepts_to_slots(
-            concepts, slots=5, rng=rng, shuffle_each_cycle=False
-        )
+        result = _expand_concepts_to_slots(concepts, slots=5, rng=rng, shuffle_each_cycle=False)
         assert len(result) == 5
         assert all(c in ["a", "b"] for c in result)
 
@@ -347,7 +342,7 @@ class TestBuildBatchesEndToEnd:
         )
 
         with_instruction = [b for b in batches if b.custom_instruction is not None]
-        without_instruction = [b for b in batches if b.custom_instruction is None]
+        _without_instruction = [b for b in batches if b.custom_instruction is None]  # noqa: F841
 
         # About 30% should have instructions
         total = len(batches)
@@ -429,13 +424,9 @@ class TestExtractQuestionTypeCounts:
                 question_types=[
                     QuestionTypeConfig(type="mcq4", count=5),
                     QuestionTypeConfig(type="true_false", count=3),
-                    QuestionTypeConfig(
-                        type="short_answer", count=0
-                    ),  # Should be excluded
+                    QuestionTypeConfig(type="short_answer", count=0),  # Should be excluded
                 ],
-                difficulty_distribution=DifficultyDistribution(
-                    easy=50, medium=30, hard=20
-                ),
+                difficulty_distribution=DifficultyDistribution(easy=50, medium=30, hard=20),
             ),
         )
 
@@ -512,7 +503,7 @@ class TestGenerateQuestionsPrompt:
     def test_handles_latex_with_curly_braces(self):
         """
         Test that prompt handles LaTeX with curly braces (no format error).
-        
+
         This tests the fix for: "Replacement index 1 out of range for positional args tuple"
         """
         # This should NOT raise an error
@@ -540,9 +531,9 @@ class TestBatchProcessingContext:
     def test_creates_context_with_required_fields(
         self,
         gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        mock_concepts_dict: dict[str, str],
+        mock_concepts_name_to_id: dict[str, str],
+        mock_old_questions: list[dict],
         mock_activity_id: uuid.UUID,
         mock_supabase_client,
     ):
@@ -566,9 +557,9 @@ class TestBatchProcessingContext:
     def test_creates_context_with_custom_marks(
         self,
         gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        mock_concepts_dict: dict[str, str],
+        mock_concepts_name_to_id: dict[str, str],
+        mock_old_questions: list[dict],
         mock_activity_id: uuid.UUID,
         mock_supabase_client,
     ):
@@ -609,9 +600,9 @@ class TestProcessBatchGeneration:
     def batch_ctx(
         self,
         gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        mock_concepts_dict: dict[str, str],
+        mock_concepts_name_to_id: dict[str, str],
+        mock_old_questions: list[dict],
         mock_activity_id: uuid.UUID,
         mock_supabase_client,
     ) -> BatchProcessingContext:
@@ -644,8 +635,6 @@ class TestProcessBatchGeneration:
         assert "batch" in result
 
 
-
-
 # ============================================================================
 # TESTS FOR process_batch_generation_and_validate
 # ============================================================================
@@ -669,9 +658,9 @@ class TestProcessBatchGenerationAndValidate:
     def batch_ctx(
         self,
         gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        mock_concepts_dict: dict[str, str],
+        mock_concepts_name_to_id: dict[str, str],
+        mock_old_questions: list[dict],
         mock_activity_id: uuid.UUID,
         mock_supabase_client,
     ) -> BatchProcessingContext:
@@ -802,9 +791,9 @@ class TestTryRetryBatch:
     def batch_ctx(
         self,
         gemini_client: genai.Client,
-        mock_concepts_dict: Dict[str, str],
-        mock_concepts_name_to_id: Dict[str, str],
-        mock_old_questions: List[dict],
+        mock_concepts_dict: dict[str, str],
+        mock_concepts_name_to_id: dict[str, str],
+        mock_old_questions: list[dict],
         mock_activity_id: uuid.UUID,
         mock_supabase_client,
     ) -> BatchProcessingContext:

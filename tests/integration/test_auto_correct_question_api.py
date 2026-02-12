@@ -6,11 +6,13 @@ the full end-to-end auto-correction flow.
 """
 
 import uuid
-from typing import Any, Dict, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, PublicQuestionTypeEnumEnum
 
 # ============================================================================
@@ -21,8 +23,8 @@ from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, Public
 @pytest.fixture
 def test_gen_question(
     service_supabase_client: Client,
-    test_activity: Dict[str, Any],
-) -> Generator[Dict[str, Any], None, None]:
+    test_activity: dict[str, Any],
+) -> Generator[dict[str, Any], None, None]:
     """
     Create a test generated question in Supabase that needs correction.
     This question will have formatting issues and grammatical errors.
@@ -55,9 +57,7 @@ def test_gen_question(
     yield response.data[0]
 
     # Cleanup: Delete the test question
-    service_supabase_client.table("gen_questions").delete().eq(
-        "id", question_id
-    ).execute()
+    service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
 
 # ============================================================================
@@ -71,7 +71,7 @@ class TestAutoCorrectQuestionAuth:
     def test_returns_401_without_auth_token(
         self,
         unauthenticated_test_client: TestClient,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 when no auth token is provided.
@@ -82,13 +82,13 @@ class TestAutoCorrectQuestionAuth:
             "/api/v1/qgen/auto_correct_question",
             data={"gen_question_id": question_id},
         )
-    
+
         assert response.status_code == 401
 
     def test_returns_401_with_invalid_token(
         self,
         app,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 with an invalid token.
@@ -137,7 +137,7 @@ class TestAutoCorrectQuestionValidation:
     def test_returns_200_on_success(
         self,
         test_client: TestClient,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that the endpoint returns 200 on successful auto-correction.
@@ -166,13 +166,12 @@ class TestAutoCorrectQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that MCQ4 questions are corrected and updated in database.
         """
         question_id = test_gen_question["id"]
-        original_text = test_gen_question["question_text"]
 
         response = test_client.post(
             "/api/v1/qgen/auto_correct_question",
@@ -205,7 +204,7 @@ class TestAutoCorrectQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that question type is preserved after auto-correction.
@@ -235,7 +234,7 @@ class TestAutoCorrectQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that MCQ4 options are preserved in structure.
@@ -271,8 +270,8 @@ class TestAutoCorrectQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_gen_question: Dict[str, Any],
+        test_activity: dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that activity_id is preserved after correction.
@@ -302,14 +301,13 @@ class TestAutoCorrectQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that the corrected question is improved in quality.
         This is a qualitative test to ensure the AI made meaningful corrections.
         """
         question_id = test_gen_question["id"]
-        original_text = test_gen_question["question_text"]
 
         response = test_client.post(
             "/api/v1/qgen/auto_correct_question",
@@ -327,7 +325,7 @@ class TestAutoCorrectQuestionSuccess:
         )
 
         corrected_text = updated_question.data[0]["question_text"]
-        corrected_explanation = updated_question.data[0]["explanation"]
+        _corrected_explanation = updated_question.data[0]["explanation"]  # noqa: F841
 
         # The corrected version should have proper formatting
         # (at least some improvement from the original)
@@ -352,8 +350,8 @@ class TestAutoCorrectQuestionEdgeCases:
     def test_short_answer_question(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-    ) -> Generator[Dict[str, Any], None, None]:
+        test_activity: dict[str, Any],
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Create a test short answer question for edge case testing.
         """
@@ -370,25 +368,19 @@ class TestAutoCorrectQuestionEdgeCases:
             "marks": 3,
         }
 
-        response = (
-            service_supabase_client.table("gen_questions")
-            .insert(question_data)
-            .execute()
-        )
+        response = service_supabase_client.table("gen_questions").insert(question_data).execute()
 
         yield response.data[0]
 
         # Cleanup
-        service_supabase_client.table("gen_questions").delete().eq(
-            "id", question_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
     @pytest.mark.slow
     def test_corrects_short_answer_question(
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_short_answer_question: Dict[str, Any],
+        test_short_answer_question: dict[str, Any],
     ):
         """
         Test that short answer questions can also be corrected.
@@ -409,7 +401,7 @@ class TestAutoCorrectQuestionEdgeCases:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question: Dict[str, Any],
+        test_gen_question: dict[str, Any],
     ):
         """
         Test that a question can be corrected multiple times if needed.

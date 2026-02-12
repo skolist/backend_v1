@@ -4,15 +4,16 @@ Get feedback API endpoint.
 Provides AI-generated feedback on question drafts.
 """
 
-import os
 import logging
+import os
 
 import supabase
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
 from google import genai
+from pydantic import BaseModel
 
 from api.v1.auth import get_supabase_client
+
 from .models import FeedbackList
 
 logger = logging.getLogger(__name__)
@@ -62,16 +63,12 @@ async def get_feedback(
     try:
         # Fetch draft to verify it exists
         draft_response = (
-            supabase_client.table("qgen_drafts")
-            .select("*")
-            .eq("id", request.draft_id)
-            .execute()
+            supabase_client.table("qgen_drafts").select("*").eq("id", request.draft_id).execute()
         )
 
         if not draft_response.data:
             raise HTTPException(status_code=404, detail="Draft not found")
 
-        draft_data = draft_response.data[0]
         logger.debug(
             "Fetched draft from database",
             extra={"draft_id": request.draft_id},
@@ -85,7 +82,7 @@ async def get_feedback(
         )
 
         section_ids = [section["id"] for section in sections_response.data]
-        
+
         if section_ids:
             questions_response = (
                 supabase_client.table("gen_questions")
@@ -161,22 +158,24 @@ async def get_feedback(
         questions_details = []
         for idx, question in enumerate(questions, 1):
             q_detail = f"""Question {idx}:
-- Type: {question.get('question_type', 'N/A')}
-- Difficulty: {question.get('hardness_level', 'N/A')}
-- Marks: {question.get('marks', 'N/A')}
-- Question Text: {question.get('question_text', 'N/A')[:200]}{"..." if len(question.get('question_text', '')) > 200 else ""}
-- Answer: {question.get('answer_text', 'N/A')[:100]}{"..." if len(question.get('answer_text', '')) > 100 else ""}"""
-            
+- Type: {question.get("question_type", "N/A")}
+- Difficulty: {question.get("hardness_level", "N/A")}
+- Marks: {question.get("marks", "N/A")}
+- Question Text: {question.get("question_text", "N/A")[:200]}{"..." if len(question.get("question_text", "")) > 200 else ""}
+- Answer: {question.get("answer_text", "N/A")[:100]}{"..." if len(question.get("answer_text", "")) > 100 else ""}"""
+
             # Add MCQ options if present
-            if question.get('question_type') == 'mcq4' and question.get('option1'):
+            if question.get("question_type") == "mcq4" and question.get("option1"):
                 q_detail += f"\n- Options: {question.get('option1', '')[:50]}, {question.get('option2', '')[:50]}, {question.get('option3', '')[:50]}, {question.get('option4', '')[:50]}"
-            elif question.get('question_type') == 'match_the_following' and question.get('match_the_following_columns'):
+            elif question.get("question_type") == "match_the_following" and question.get(
+                "match_the_following_columns"
+            ):
                 q_detail += f"\n- Columns: {str(question.get('match_the_following_columns'))[:200]}"
-            
+
             questions_details.append(q_detail)
-        
+
         questions_text = "\n\n".join(questions_details)
-        
+
         prompt = f"""Analyze the following question paper draft and provide constructive feedback.
 
 Draft Statistics:
@@ -199,11 +198,11 @@ Each feedback should focus on:
 
 Prioritize feedback items from 1-10 (10 being most critical).
 """
-        for i  in range(3):
+        for i in range(3):
             try:
                 logger.debug(
                     "Generating AI feedback",
-                    extra={"draft_id": request.draft_id, "retry":i+1},
+                    extra={"draft_id": request.draft_id, "retry": i + 1},
                 )
                 response = await gemini_client.aio.models.generate_content(
                     model="gemini-2.5-flash",
@@ -211,7 +210,7 @@ Prioritize feedback items from 1-10 (10 being most critical).
                     config={
                         "response_mime_type": "application/json",
                         "response_schema": FeedbackList,
-                        },
+                    },
                 )
                 break
             except Exception as e:
@@ -221,14 +220,14 @@ Prioritize feedback items from 1-10 (10 being most critical).
                         "draft_id": request.draft_id,
                         "error": str(e),
                         "error_type": type(e).__name__,
-                        "retry":i+1,
+                        "retry": i + 1,
                     },
                 )
                 if i == 2:
                     raise HTTPException(
                         status_code=500,
                         detail="Failed to generate feedback after multiple attempts",
-                    )
+                    ) from e
 
         feedback_list = response.parsed
         logger.info(

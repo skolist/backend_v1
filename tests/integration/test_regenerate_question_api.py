@@ -6,11 +6,13 @@ the full end-to-end question regeneration flow.
 """
 
 import uuid
-from typing import Any, Dict, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, PublicQuestionTypeEnumEnum
 
 # ============================================================================
@@ -21,8 +23,8 @@ from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, Public
 @pytest.fixture
 def test_gen_question_for_regeneration(
     service_supabase_client: Client,
-    test_activity: Dict[str, Any],
-) -> Generator[Dict[str, Any], None, None]:
+    test_activity: dict[str, Any],
+) -> Generator[dict[str, Any], None, None]:
     """
     Create a test generated question in Supabase for regeneration testing.
     """
@@ -54,9 +56,7 @@ def test_gen_question_for_regeneration(
     yield response.data[0]
 
     # Cleanup: Delete the test question
-    service_supabase_client.table("gen_questions").delete().eq(
-        "id", question_id
-    ).execute()
+    service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
 
 # ============================================================================
@@ -70,7 +70,7 @@ class TestRegenerateQuestionAuth:
     def test_returns_401_without_auth_token(
         self,
         unauthenticated_test_client: TestClient,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 when no auth token is provided.
@@ -86,7 +86,7 @@ class TestRegenerateQuestionAuth:
     def test_returns_401_with_invalid_token(
         self,
         app,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 with an invalid token.
@@ -133,7 +133,7 @@ class TestRegenerateQuestionValidation:
     def test_returns_200_on_success(
         self,
         test_client: TestClient,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 200 on successful regeneration.
@@ -161,13 +161,13 @@ class TestRegenerateQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that MCQ4 questions are regenerated and updated in database.
         """
         question_id = test_gen_question_for_regeneration["id"]
-        original_text = test_gen_question_for_regeneration["question_text"]
+        _original_text = test_gen_question_for_regeneration["question_text"]  # noqa: F841 - kept for documentation
 
         response = test_client.post(
             f"/api/v1/qgen/regenerate_question?gen_question_id={question_id}",
@@ -195,7 +195,7 @@ class TestRegenerateQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated question maintains MCQ4 structure.
@@ -230,8 +230,8 @@ class TestRegenerateQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_activity: dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that activity_id is preserved after regeneration.
@@ -260,7 +260,7 @@ class TestRegenerateQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated question includes an explanation.
@@ -290,7 +290,7 @@ class TestRegenerateQuestionSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated question is about the same concept.
@@ -331,8 +331,8 @@ class TestRegenerateQuestionEdgeCases:
     def test_short_answer_question_for_regeneration(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-    ) -> Generator[Dict[str, Any], None, None]:
+        test_activity: dict[str, Any],
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Create a test short answer question for edge case testing.
         """
@@ -349,25 +349,19 @@ class TestRegenerateQuestionEdgeCases:
             "marks": 3,
         }
 
-        response = (
-            service_supabase_client.table("gen_questions")
-            .insert(question_data)
-            .execute()
-        )
+        response = service_supabase_client.table("gen_questions").insert(question_data).execute()
 
         yield response.data[0]
 
         # Cleanup
-        service_supabase_client.table("gen_questions").delete().eq(
-            "id", question_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
     @pytest.mark.slow
     def test_regenerates_short_answer_question(
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_short_answer_question_for_regeneration: Dict[str, Any],
+        test_short_answer_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that short answer questions can also be regenerated.
@@ -387,7 +381,7 @@ class TestRegenerateQuestionEdgeCases:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that a question can be regenerated multiple times.
@@ -437,7 +431,7 @@ class TestRegenerateQuestionEdgeCases:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_regeneration: Dict[str, Any],
+        test_gen_question_for_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated MCQ4 question has a valid correct option (1-4).

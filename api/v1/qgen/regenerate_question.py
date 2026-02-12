@@ -7,20 +7,21 @@ Architecture:
     3. try_retry_and_update() - Retry wrapper (5 retries) + updates Supabase
 """
 
-import os
 import logging
+import os
 
 import supabase
-from pydantic import BaseModel, Field
-from google import genai
-from fastapi import Depends, status, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.responses import Response
+from google import genai
+from pydantic import BaseModel, Field
 
 from api.v1.auth import get_supabase_client, require_supabase_user
+from supabase_dir import GenImagesInsert
+
+from .credits import check_user_has_credits, deduct_user_credits
 from .models import AllQuestions
 from .prompts import regenerate_question_prompt
-from .credits import check_user_has_credits, deduct_user_credits
-from supabase_dir import GenImagesInsert
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ async def process_question(
     Raises:
         QuestionProcessingError: If the API call fails
     """
-    prefix = _log_prefix(retry_idx)
+    _log_prefix(retry_idx)  # For consistent logging format
 
     logger.debug(
         "Processing regenerate for question",
@@ -156,7 +157,7 @@ async def process_question_and_validate(
         QuestionValidationError: If validation fails
         QuestionProcessingError: If the API call fails
     """
-    prefix = _log_prefix(retry_idx)
+    _log_prefix(retry_idx)  # For consistent logging format
 
     logger.debug(
         "Starting regenerate processing and validation",
@@ -186,7 +187,7 @@ async def process_question_and_validate(
                 "error": str(parse_error),
             },
         )
-        raise QuestionValidationError(f"Failed to parse response: {parse_error}")
+        raise QuestionValidationError(f"Failed to parse response: {parse_error}") from parse_error
 
     # Step 3: Validate essential fields
     if not regenerated_question.question_text:
@@ -244,7 +245,7 @@ async def try_retry_and_update(
 
     for attempt in range(max_retries):
         retry_idx = attempt + 1
-        prefix = _log_prefix(retry_idx)
+        _log_prefix(retry_idx)  # For consistent logging format
 
         try:
             logger.debug(
@@ -266,10 +267,10 @@ async def try_retry_and_update(
 
             # Update the question in the database
             update_data = regenerated_question.model_dump(exclude_none=True)
-            
+
             # Extract SVGs before updating gen_questions (svgs is not a column in gen_questions)
             svg_list = update_data.pop("svgs", None)
-            
+
             # Map 'columns' to 'match_the_following_columns' if it exists (for match_the_following type)
             if "columns" in update_data:
                 cols = update_data.pop("columns")
@@ -279,27 +280,31 @@ async def try_retry_and_update(
                         if isinstance(col, dict):
                             dict_cols[col["name"]] = col["items"]
                         else:
-                            dict_cols[getattr(col, 'name', '')] = getattr(col, 'items', [])
+                            dict_cols[getattr(col, "name", "")] = getattr(col, "items", [])
                     update_data["match_the_following_columns"] = dict_cols
                 else:
                     update_data["match_the_following_columns"] = cols
-            
+
             supabase_client.table("gen_questions").update(update_data).eq(
                 "id", gen_question_id
             ).execute()
-            
+
             # Insert SVGs into gen_images table if present
             if svg_list:
-                logger.debug(f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found")
-                
+                logger.debug(
+                    f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found"
+                )
+
                 # First, delete existing SVGs for this question (to replace with new ones)
                 supabase_client.table("gen_images").delete().eq(
                     "gen_question_id", gen_question_id
                 ).execute()
-                
+
                 for position, svg_item in enumerate(svg_list, start=1):
                     try:
-                        svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
+                        svg_string = (
+                            svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
+                        )
                         if svg_string:
                             gen_image = GenImagesInsert(
                                 gen_question_id=gen_question_id,
@@ -310,7 +315,9 @@ async def try_retry_and_update(
                                 gen_image.model_dump(mode="json", exclude_none=True)
                             ).execute()
                     except Exception as svg_error:
-                        logger.warning(f"Failed to insert SVG for question {gen_question_id}: {svg_error}")
+                        logger.warning(
+                            f"Failed to insert SVG for question {gen_question_id}: {svg_error}"
+                        )
 
             logger.debug(
                 "Database update completed successfully",
@@ -372,10 +379,12 @@ async def regenerate_question(
         500 Internal Server Error on failure
     """
     user_id = user.id
-    
+
     # Check credits
     if not check_user_has_credits(user_id):
-        return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
+        return Response(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits"
+        )
 
     logger.info(
         "Received regenerate request",
@@ -385,10 +394,7 @@ async def regenerate_question(
     # Fetch the question from the database
     try:
         gen_question = (
-            supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", gen_question_id)
-            .execute()
+            supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).execute()
         )
 
         if not gen_question.data:
@@ -423,7 +429,7 @@ async def regenerate_question(
             supabase_client=supabase_client,
             max_retries=5,
         )
-        
+
         # Deduct 2 credits
         deduct_user_credits(user_id, 2)
 

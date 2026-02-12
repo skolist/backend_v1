@@ -5,10 +5,10 @@ This module contains all the base prompt functions used by the qgen API endpoint
 """
 
 from .auto_correct import auto_correct_questions_prompt
+from .extract_questions import extract_questions_prompt
 from .generate_questions import generate_questions_with_concepts_prompt
 from .regenerate import regenerate_question_prompt
 from .regenerate_with_prompt import regenerate_question_with_prompt_prompt
-from .extract_questions import extract_questions_prompt
 
 __all__ = [
     "auto_correct_questions_prompt",
@@ -17,4 +17,3 @@ __all__ = [
     "regenerate_question_with_prompt_prompt",
     "extract_questions_prompt",
 ]
-

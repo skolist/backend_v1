@@ -5,6 +5,7 @@ Prompt template for auto-correcting questions.
 from .common_instructions import COMMON_INSTRUCTIONS
 from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
+
 def auto_correct_questions_prompt(gen_question: dict) -> str:
     """
     Generate prompt to auto correct a question.
@@ -17,8 +18,8 @@ def auto_correct_questions_prompt(gen_question: dict) -> str:
     """
     # Using f-string instead of .format() to avoid issues with curly braces in LaTeX
     return f"""
-    You are given this question {gen_question} and it may not be in proper latex format and a organised way. 
-    There may be some grammatical errors in it. Please correct it, don't change anything related to the meaning 
+    You are given this question {gen_question} and it may not be in proper latex format and a organised way.
+    There may be some grammatical errors in it. Please correct it, don't change anything related to the meaning
     of the question itself. Return the corrected question in the same format.
     If user has requested something, then there must be something like either grammatical or latex error. High probability that it is latex error in maths question, so check the question carefully.
     If an image is attached, use it to help understand and correct the question content.

@@ -4,7 +4,7 @@ Contains the logic to retry calls to Gemini's generate_content method.
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from google import genai
 
@@ -16,7 +16,7 @@ async def generate_content_with_retries(
     gemini_client: genai.Client,
     model: str,
     contents: Any,
-    config: Optional[Dict[str, Any]] = None,
+    config: dict[str, Any] | None = None,
     retries: int = 5,
     initial_delay: float = 1.0,
 ) -> Any:
@@ -40,7 +40,7 @@ async def generate_content_with_retries(
     """
     attempt = 0
     delay = initial_delay
-    last_exc: Optional[Exception] = None
+    last_exc: Exception | None = None
 
     while attempt < retries:
         try:

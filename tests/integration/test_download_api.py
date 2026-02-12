@@ -5,11 +5,12 @@ Tests the document generation functionality.
 """
 
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import (
     GenQuestionsInsert,
     PublicHardnessLevelEnumEnum,
@@ -25,21 +26,24 @@ from supabase_dir import (
 @pytest.fixture
 def test_draft_with_section(
     service_supabase_client: Client,
-    test_activity: Dict[str, Any],
+    test_activity: dict[str, Any],
 ):
     """Create a test draft with a section and questions for download testing."""
     section_id = str(uuid.uuid4())
-    
+
     # Get the auto-created draft for this activity (created by trigger on activity insert)
-    draft_resp = service_supabase_client.table("qgen_drafts").select("id").eq(
-        "activity_id", test_activity["id"]
-    ).execute()
-    
+    draft_resp = (
+        service_supabase_client.table("qgen_drafts")
+        .select("id")
+        .eq("activity_id", test_activity["id"])
+        .execute()
+    )
+
     if not draft_resp.data:
         pytest.skip("No draft found for test activity")
-    
+
     draft_id = draft_resp.data[0]["id"]
-    
+
     # Create section (column is 'section_name' and 'position_in_draft')
     section_data = QgenDraftSectionsInsert(
         id=uuid.UUID(section_id),
@@ -50,7 +54,7 @@ def test_draft_with_section(
     service_supabase_client.table("qgen_draft_sections").insert(
         section_data.model_dump(mode="json", exclude_none=True)
     ).execute()
-    
+
     # Create questions
     question_ids = []
     for i in range(3):
@@ -61,7 +65,7 @@ def test_draft_with_section(
             activity_id=uuid.UUID(test_activity["id"]),
             qgen_draft_section_id=uuid.UUID(section_id),
             question_type=PublicQuestionTypeEnumEnum.MCQ4,
-            question_text=f"What is {i+1} + {i+1}?",
+            question_text=f"What is {i + 1} + {i + 1}?",
             option1=str(i * 2),
             option2=str((i + 1) * 2),
             option3=str((i + 2) * 2),
@@ -75,21 +79,17 @@ def test_draft_with_section(
         service_supabase_client.table("gen_questions").insert(
             question_data.model_dump(mode="json", exclude_none=True)
         ).execute()
-    
+
     yield {
         "draft_id": draft_id,
         "section_id": section_id,
         "question_ids": question_ids,
         "activity_id": test_activity["id"],
     }
-    
+
     # Cleanup (draft is auto-created with activity, deleted via cascade)
-    service_supabase_client.table("gen_questions").delete().in_(
-        "id", question_ids
-    ).execute()
-    service_supabase_client.table("qgen_draft_sections").delete().eq(
-        "id", section_id
-    ).execute()
+    service_supabase_client.table("gen_questions").delete().in_("id", question_ids).execute()
+    service_supabase_client.table("qgen_draft_sections").delete().eq("id", section_id).execute()
 
 
 # ============================================================================
@@ -153,7 +153,7 @@ class TestDownloadPDFFunctional:
     def test_generates_pdf_with_questions_only(
         self,
         test_client: TestClient,
-        test_draft_with_section: Dict[str, Any],
+        test_draft_with_section: dict[str, Any],
     ):
         """Test that the endpoint generates a PDF with questions only."""
         response = test_client.post(
@@ -163,7 +163,7 @@ class TestDownloadPDFFunctional:
                 "mode": "paper",
             },
         )
-        
+
         assert response.status_code == 200
         # PDF responses should have PDF content type
         assert "application/pdf" in response.headers.get("content-type", "")
@@ -172,7 +172,7 @@ class TestDownloadPDFFunctional:
     def test_generates_pdf_with_answers(
         self,
         test_client: TestClient,
-        test_draft_with_section: Dict[str, Any],
+        test_draft_with_section: dict[str, Any],
     ):
         """Test that the endpoint generates a PDF with answers included."""
         response = test_client.post(
@@ -182,7 +182,7 @@ class TestDownloadPDFFunctional:
                 "mode": "answer",
             },
         )
-        
+
         assert response.status_code == 200
         assert "application/pdf" in response.headers.get("content-type", "")
 
@@ -248,7 +248,7 @@ class TestDownloadDOCXFunctional:
     def test_generates_docx_with_questions_only(
         self,
         test_client: TestClient,
-        test_draft_with_section: Dict[str, Any],
+        test_draft_with_section: dict[str, Any],
     ):
         """Test that the endpoint generates a DOCX with questions only."""
         response = test_client.post(
@@ -258,17 +258,20 @@ class TestDownloadDOCXFunctional:
                 "mode": "paper",
             },
         )
-        
+
         assert response.status_code == 200
         # DOCX responses should have appropriate content type
         content_type = response.headers.get("content-type", "")
-        assert "application/vnd.openxmlformats-officedocument" in content_type or "application/octet-stream" in content_type
+        assert (
+            "application/vnd.openxmlformats-officedocument" in content_type
+            or "application/octet-stream" in content_type
+        )
 
     @pytest.mark.slow
     def test_generates_docx_with_answers(
         self,
         test_client: TestClient,
-        test_draft_with_section: Dict[str, Any],
+        test_draft_with_section: dict[str, Any],
     ):
         """Test that the endpoint generates a DOCX with answers included."""
         response = test_client.post(
@@ -278,5 +281,5 @@ class TestDownloadDOCXFunctional:
                 "mode": "answer",
             },
         )
-        
+
         assert response.status_code == 200

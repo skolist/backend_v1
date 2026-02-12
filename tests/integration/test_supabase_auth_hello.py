@@ -5,13 +5,11 @@ Test integration of Supabase authentication with FastAPI endpoint.
 import os
 
 import pytest
-
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from supabase import create_client
 
 from app import create_app
-
 
 # Hardcoded test credentials - must match skolist-db/seed_users.py
 TEST_USER_EMAIL = "test@example.com"

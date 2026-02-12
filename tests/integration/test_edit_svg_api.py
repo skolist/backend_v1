@@ -5,11 +5,12 @@ Tests the AI-powered SVG editing functionality.
 """
 
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import (
     GenImagesInsert,
     GenQuestionsInsert,
@@ -87,12 +88,12 @@ class TestEditSVGFunctional:
     def test_gen_image(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
+        test_activity: dict[str, Any],
     ):
         """Create a test gen_image for SVG editing."""
         image_id = str(uuid.uuid4())
         question_id = str(uuid.uuid4())
-        
+
         # Create a gen_question first (required for gen_image)
         question_data = GenQuestionsInsert(
             id=uuid.UUID(question_id),
@@ -111,13 +112,13 @@ class TestEditSVGFunctional:
         service_supabase_client.table("gen_questions").insert(
             question_data.model_dump(mode="json", exclude_none=True)
         ).execute()
-        
+
         # Create gen_image with SVG content
         sample_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
             <circle cx="100" cy="100" r="50" fill="blue"/>
             <text x="100" y="100" text-anchor="middle">r = 50</text>
         </svg>"""
-        
+
         image_data = GenImagesInsert(
             id=uuid.UUID(image_id),
             gen_question_id=uuid.UUID(question_id),
@@ -127,24 +128,20 @@ class TestEditSVGFunctional:
         service_supabase_client.table("gen_images").insert(
             image_data.model_dump(mode="json", exclude_none=True)
         ).execute()
-        
+
         yield {
             "image_id": image_id,
             "question_id": question_id,
         }
-        
+
         # Cleanup
-        service_supabase_client.table("gen_images").delete().eq(
-            "id", image_id
-        ).execute()
-        service_supabase_client.table("gen_questions").delete().eq(
-            "id", question_id
-        ).execute()
+        service_supabase_client.table("gen_images").delete().eq("id", image_id).execute()
+        service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
     def test_edits_svg_with_valid_instruction(
         self,
         test_client: TestClient,
-        test_gen_image: Dict[str, Any],
+        test_gen_image: dict[str, Any],
     ):
         """Test that the endpoint edits SVG with a valid instruction."""
         response = test_client.post(
@@ -154,10 +151,10 @@ class TestEditSVGFunctional:
                 "instruction": "Change the circle radius to 75",
             },
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Should return updated SVG
         assert "svg_string" in data or "id" in data
 
@@ -173,6 +170,6 @@ class TestEditSVGFunctional:
                 "instruction": "Move the label",
             },
         )
-        
+
         # Should return 400 or 404
         assert response.status_code in [400, 404]

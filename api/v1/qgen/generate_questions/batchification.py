@@ -8,7 +8,7 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,14 @@ class Batch:
     question_type: str
     difficulty: str
     n_questions: int  # <= max_questions_per_batch
-    concepts: List[str]  # at least 1 concept per batch
+    concepts: list[str]  # at least 1 concept per batch
     custom_instruction: Any  # str | list | dict | None
 
 
 # ----------------------------
 # Helpers
 # ----------------------------
-def _dedupe_preserve_order(items: List[str]) -> List[str]:
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
     seen = set()
     out = []
     for x in items:
@@ -41,7 +41,7 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
     return out
 
 
-def _normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
+def _normalize_weights(weights: dict[str, float]) -> dict[str, float]:
     cleaned = {k: float(v) for k, v in weights.items() if float(v) >= 0.0}
     s = sum(cleaned.values())
     if s <= 0:
@@ -51,9 +51,9 @@ def _normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
 
 def _largest_remainder_apportion(
     total: int,
-    keys: List[str],
-    weights: Dict[str, float],
-) -> Dict[str, int]:
+    keys: list[str],
+    weights: dict[str, float],
+) -> dict[str, int]:
     """
     Integer apportionment using Largest Remainder method.
     Sums exactly to `total`. Zero weights naturally get 0.
@@ -63,7 +63,7 @@ def _largest_remainder_apportion(
 
     w = {k: float(weights.get(k, 0.0)) for k in keys}
     if sum(w.values()) <= 0 or total == 0:
-        return {k: 0 for k in keys}
+        return dict.fromkeys(keys, 0)
 
     w_norm = _normalize_weights(w)
     ideals = {k: w_norm[k] * total for k in keys}
@@ -71,19 +71,17 @@ def _largest_remainder_apportion(
     used = sum(floors.values())
     rem = total - used
 
-    remainders = sorted(
-        keys, key=lambda k: (ideals[k] - floors[k], w_norm[k]), reverse=True
-    )
+    remainders = sorted(keys, key=lambda k: (ideals[k] - floors[k], w_norm[k]), reverse=True)
     for k in remainders[:rem]:
         floors[k] += 1
 
     return floors
 
 
-def _chunk_questions(n: int, max_per_chunk: int = 3) -> List[int]:
+def _chunk_questions(n: int, max_per_chunk: int = 3) -> list[int]:
     if n < 0:
         raise ValueError("n must be >= 0")
-    out: List[int] = []
+    out: list[int] = []
     while n > 0:
         take = min(max_per_chunk, n)
         out.append(take)
@@ -92,12 +90,12 @@ def _chunk_questions(n: int, max_per_chunk: int = 3) -> List[int]:
 
 
 def _expand_concepts_to_slots(
-    concepts: List[str],
+    concepts: list[str],
     slots: int,
     *,
     rng: random.Random,
     shuffle_each_cycle: bool = True,
-) -> List[str]:
+) -> list[str]:
     """
     If concepts < slots, repeat concepts until length==slots.
     Repetition happens ONLY when needed.
@@ -111,7 +109,7 @@ def _expand_concepts_to_slots(
     if len(base) >= slots:
         return base[:slots]
 
-    expanded: List[str] = []
+    expanded: list[str] = []
     while len(expanded) < slots:
         cycle = base[:]
         if shuffle_each_cycle:
@@ -121,13 +119,13 @@ def _expand_concepts_to_slots(
 
 
 def _apply_custom_instruction_fraction(
-    batches: List[Batch],
+    batches: list[Batch],
     custom_instruction_value: Any,
     fraction: float,
     *,
     mode: str = "first",  # "first" or "random"
-    seed: Optional[int] = None,
-) -> List[Batch]:
+    seed: int | None = None,
+) -> list[Batch]:
     """
     Keep custom_instruction only in fraction of batches; others -> None.
     fraction rounding: k = round(N * fraction)
@@ -154,8 +152,7 @@ def _apply_custom_instruction_fraction(
             extra={"reason": "k <= 0"},
         )
         return [
-            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, None)
-            for b in batches
+            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, None) for b in batches
         ]
     if k >= n:
         logger.debug(
@@ -191,12 +188,10 @@ def _apply_custom_instruction_fraction(
         },
     )
 
-    updated: List[Batch] = []
+    updated: list[Batch] = []
     for i, b in enumerate(batches):
         ci = custom_instruction_value if i in chosen else None
-        updated.append(
-            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, ci)
-        )
+        updated.append(Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, ci))
     return updated
 
 
@@ -205,17 +200,17 @@ def _apply_custom_instruction_fraction(
 # ----------------------------
 # pylint: disable=too-many-branches, too-many-statements
 def build_batches_end_to_end(
-    question_type_counts: Dict[str, int],
-    concepts: List[str],
-    difficulty_percent: Dict[str, float],
+    question_type_counts: dict[str, int],
+    concepts: list[str],
+    difficulty_percent: dict[str, float],
     custom_instruction: Any,
     *,
     max_questions_per_batch: int = 3,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     shuffle_input_concepts: bool = True,
     custom_instruction_fraction: float = 0.30,
     custom_instruction_mode: str = "first",  # "first" or "random"
-) -> List[Batch]:
+) -> list[Batch]:
     """
     End-to-end batch builder.
 
@@ -230,9 +225,7 @@ def build_batches_end_to_end(
     - Each (type,difficulty) bucket is split into granular batches of <=3 questions.
     - Custom instruction appears in only ~30% batches (rounded), rest None.
     """
-    active_types = [
-        (qt, int(cnt)) for qt, cnt in question_type_counts.items() if int(cnt) > 0
-    ]
+    active_types = [(qt, int(cnt)) for qt, cnt in question_type_counts.items() if int(cnt) > 0]
     if not active_types:
         raise ValueError("No question types with count > 0 provided.")
 
@@ -263,7 +256,7 @@ def build_batches_end_to_end(
     type_keys = [qt for qt, _ in active_types]
     type_weights = {qt: cnt / total_questions for qt, cnt in active_types}
     slots_per_type = _largest_remainder_apportion(total_slots, type_keys, type_weights)
-    type_slots: Dict[str, List[str]] = {}
+    type_slots: dict[str, list[str]] = {}
     idx = 0
     for qt in type_keys:
         n = slots_per_type[qt]
@@ -285,7 +278,7 @@ def build_batches_end_to_end(
             type_slots[zt] = [moved]
 
     # Build batches per type -> difficulty -> chunks
-    batches: List[Batch] = []
+    batches: list[Batch] = []
 
     for qt, q_count in active_types:
         # Questions per difficulty for this type
@@ -319,9 +312,7 @@ def build_batches_end_to_end(
             # Split diff_slots across chunks proportional to chunk sizes
             chunk_keys = [str(i) for i in range(len(q_chunks))]
             chunk_weights = {str(i): q_chunks[i] / n_q for i in range(len(q_chunks))}
-            s_per_chunk = _largest_remainder_apportion(
-                len(diff_slots), chunk_keys, chunk_weights
-            )
+            s_per_chunk = _largest_remainder_apportion(len(diff_slots), chunk_keys, chunk_weights)
 
             pos = 0
             for i, qn in enumerate(q_chunks):

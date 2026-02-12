@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional
 
 import supabase
 from google import genai
@@ -49,41 +48,36 @@ class EditSVGService:
     ) -> dict:
         """
         Edit an SVG based on natural language instruction.
-        
+
         Args:
             gen_image_id: UUID of the image in gen_images table
             instruction: Natural language instruction for editing
             supabase_client: Supabase client instance
-            
+
         Returns:
             dict with updated svg_string
         """
         # 1. Fetch current SVG from gen_images
         logger.info(f"Fetching SVG for image {gen_image_id}")
-        result = (
-            supabase_client.table("gen_images")
-            .select("*")
-            .eq("id", gen_image_id)
-            .execute()
-        )
-        
+        result = supabase_client.table("gen_images").select("*").eq("id", gen_image_id).execute()
+
         if not result.data:
             raise SVGEditError(f"Image with id {gen_image_id} not found")
-        
+
         image_data = result.data[0]
         current_svg = image_data.get("svg_string")
-        
+
         if not current_svg:
             raise SVGEditError("Image does not have an SVG string to edit")
-        
+
         # 2. Generate prompt and call Gemini
         prompt = edit_svg_prompt(current_svg, instruction)
-        
+
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        
+
         max_retries = 3
         last_exception = None
-        
+
         for attempt in range(max_retries):
             try:
                 response = await gemini_client.aio.models.generate_content(
@@ -93,10 +87,10 @@ class EditSVGService:
                         "temperature": 0.2,  # Lower temperature for more precise edits
                     },
                 )
-                
+
                 # Extract SVG from response
                 new_svg = response.text.strip()
-                
+
                 # Clean up response if it has markdown code blocks
                 if new_svg.startswith("```"):
                     # Remove markdown code blocks
@@ -113,28 +107,30 @@ class EditSVGService:
                             end_idx = i
                             break
                     new_svg = "\n".join(lines[start_idx:end_idx]).strip()
-                
+
                 # Validate it starts with <svg
                 if not new_svg.startswith("<svg") and not new_svg.startswith("<?xml"):
-                    logger.warning(f"Attempt {attempt+1}: Response doesn't look like SVG: {new_svg[:100]}")
+                    logger.warning(
+                        f"Attempt {attempt + 1}: Response doesn't look like SVG: {new_svg[:100]}"
+                    )
                     continue
-                
+
                 # 3. Update in Supabase
-                supabase_client.table("gen_images").update({
-                    "svg_string": new_svg
-                }).eq("id", gen_image_id).execute()
-                
+                supabase_client.table("gen_images").update({"svg_string": new_svg}).eq(
+                    "id", gen_image_id
+                ).execute()
+
                 logger.info(f"Successfully updated SVG for image {gen_image_id}")
-                
+
                 return {
                     "id": gen_image_id,
                     "svg_string": new_svg,
                     "gen_question_id": image_data.get("gen_question_id"),
                     "position": image_data.get("position"),
                 }
-                
+
             except Exception as e:
                 last_exception = e
-                logger.warning(f"Attempt {attempt+1} failed: {e}")
-        
+                logger.warning(f"Attempt {attempt + 1} failed: {e}")
+
         raise SVGEditError(f"SVG edit failed after {max_retries} retries") from last_exception

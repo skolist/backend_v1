@@ -3,14 +3,13 @@
 Module Exposes a function to test if all API and SECURE KEYs are work
 """
 
-import time
 import functools
 import logging
+import time
 
 import requests
-
-from openai import OpenAI
 from google import genai
+from openai import OpenAI
 from supabase import create_client
 
 logger = logging.getLogger(__name__)

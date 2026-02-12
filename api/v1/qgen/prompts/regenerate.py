@@ -5,6 +5,7 @@ Prompt template for regenerating questions.
 from .common_instructions import COMMON_INSTRUCTIONS
 from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
+
 def regenerate_question_prompt(gen_question: dict) -> str:
     """
     Generate prompt to regenerate a question.
@@ -18,7 +19,7 @@ def regenerate_question_prompt(gen_question: dict) -> str:
     # Using f-string to avoid issues with curly braces in LaTeX
     return f"""
     You are given this question {gen_question}. Using the same concepts in this question, generate a new question. Return the new question in the same format.
-    
+
     Common Latex Errors are:
         {COMMON_INSTRUCTIONS}
 

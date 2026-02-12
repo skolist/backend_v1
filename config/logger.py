@@ -122,14 +122,33 @@ class ColoredConsoleFormatter(logging.Formatter):
 
         # Append extra fields if present (excluding standard LogRecord attributes)
         standard_attrs = {
-            "name", "msg", "args", "created", "filename", "funcName", "levelname",
-            "levelno", "lineno", "module", "msecs", "pathname", "process",
-            "processName", "relativeCreated", "stack_info", "exc_info", "exc_text",
-            "thread", "threadName", "taskName", "message",
+            "name",
+            "msg",
+            "args",
+            "created",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "exc_info",
+            "exc_text",
+            "thread",
+            "threadName",
+            "taskName",
+            "message",
         }
 
         extra_fields = {
-            k: v for k, v in record.__dict__.items()
+            k: v
+            for k, v in record.__dict__.items()
             if k not in standard_attrs and not k.startswith("_")
         }
 

@@ -7,18 +7,17 @@ to validate the new refactored architecture:
     2. process_question_and_validate() - Calls process_question + validates response
 """
 
-import pytest
 import google.genai as genai
+import pytest
 
+from api.v1.qgen.models import MCQ4, ShortAnswer
 from api.v1.qgen.regenerate_question import (
-    regenerate_question_prompt,
-    process_question,
-    process_question_and_validate,
     QuestionProcessingError,
     QuestionValidationError,
+    process_question,
+    process_question_and_validate,
+    regenerate_question_prompt,
 )
-from api.v1.qgen.models import MCQ4, ShortAnswer
-
 
 # ============================================================================
 # FIXTURES
@@ -114,7 +113,7 @@ class TestRegenerateQuestionPrompt:
     def test_handles_latex_with_curly_braces(self, mock_latex_question: dict):
         """
         Test that prompt handles LaTeX with curly braces (no format error).
-        
+
         This tests the fix for: "Replacement index 1 out of range for positional args tuple"
         """
         # This should NOT raise an error

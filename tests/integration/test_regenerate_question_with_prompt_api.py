@@ -7,11 +7,13 @@ the full end-to-end question regeneration with custom prompts flow.
 
 import io
 import uuid
-from typing import Any, Dict, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, PublicQuestionTypeEnumEnum
 
 # ============================================================================
@@ -22,8 +24,8 @@ from supabase_dir import GenQuestionsInsert, PublicHardnessLevelEnumEnum, Public
 @pytest.fixture
 def test_gen_question_for_prompt_regeneration(
     service_supabase_client: Client,
-    test_activity: Dict[str, Any],
-) -> Generator[Dict[str, Any], None, None]:
+    test_activity: dict[str, Any],
+) -> Generator[dict[str, Any], None, None]:
     """
     Create a test generated question in Supabase for prompt-based regeneration testing.
     """
@@ -55,9 +57,7 @@ def test_gen_question_for_prompt_regeneration(
     yield response.data[0]
 
     # Cleanup: Delete the test question
-    service_supabase_client.table("gen_questions").delete().eq(
-        "id", question_id
-    ).execute()
+    service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
 
 # ============================================================================
@@ -71,7 +71,7 @@ class TestRegenerateQuestionWithPromptAuth:
     def test_returns_401_without_auth_token(
         self,
         unauthenticated_test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 when no auth token is provided.
@@ -88,7 +88,7 @@ class TestRegenerateQuestionWithPromptAuth:
     def test_returns_401_with_invalid_token(
         self,
         app,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 401 with an invalid token.
@@ -137,7 +137,7 @@ class TestRegenerateQuestionWithPromptValidation:
     def test_returns_200_on_success_without_prompt(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 200 on successful regeneration without prompt.
@@ -154,7 +154,7 @@ class TestRegenerateQuestionWithPromptValidation:
     def test_returns_200_on_success_with_prompt(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint returns 200 on successful regeneration with prompt.
@@ -185,7 +185,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that questions are regenerated with custom prompt and updated in database.
@@ -222,7 +222,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that regeneration without prompt uses same concepts (default behavior).
@@ -252,7 +252,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated question maintains MCQ4 structure.
@@ -291,7 +291,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the regenerated question includes an explanation.
@@ -332,7 +332,7 @@ class TestRegenerateQuestionWithFiles:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that questions can be regenerated with a text file attachment.
@@ -358,7 +358,7 @@ class TestRegenerateQuestionWithFiles:
     def test_regenerates_with_multiple_files(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that questions can be regenerated with multiple file attachments.
@@ -390,7 +390,7 @@ class TestRegenerateQuestionWithFiles:
     def test_regenerates_with_files_but_no_prompt(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that questions can be regenerated with files but no custom prompt.
@@ -421,8 +421,8 @@ class TestRegenerateQuestionWithPromptEdgeCases:
     def test_short_answer_question_for_prompt_regeneration(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-    ) -> Generator[Dict[str, Any], None, None]:
+        test_activity: dict[str, Any],
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Create a test short answer question for prompt-based regeneration testing.
         """
@@ -439,24 +439,18 @@ class TestRegenerateQuestionWithPromptEdgeCases:
             "marks": 3,
         }
 
-        response = (
-            service_supabase_client.table("gen_questions")
-            .insert(question_data)
-            .execute()
-        )
+        response = service_supabase_client.table("gen_questions").insert(question_data).execute()
 
         yield response.data[0]
 
-        service_supabase_client.table("gen_questions").delete().eq(
-            "id", question_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().eq("id", question_id).execute()
 
     @pytest.mark.slow
     def test_regenerates_short_answer_with_prompt(
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_short_answer_question_for_prompt_regeneration: Dict[str, Any],
+        test_short_answer_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that short answer questions can be regenerated with prompts.
@@ -486,7 +480,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
     def test_handles_empty_prompt_string(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that empty prompt string falls back to default regeneration.
@@ -507,7 +501,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
     def test_handles_whitespace_only_prompt(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that whitespace-only prompt falls back to default regeneration.
@@ -528,7 +522,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
     def test_handles_very_long_prompt(
         self,
         test_client: TestClient,
-        test_gen_question_for_prompt_regeneration: Dict[str, Any],
+        test_gen_question_for_prompt_regeneration: dict[str, Any],
     ):
         """
         Test that the endpoint handles very long prompts.

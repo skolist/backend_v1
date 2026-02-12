@@ -5,11 +5,12 @@ Tests the AI-generated feedback functionality for question drafts.
 """
 
 import uuid
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
+
 from supabase_dir import (
     GenQuestionsInsert,
     PublicHardnessLevelEnumEnum,
@@ -80,21 +81,24 @@ class TestGetFeedbackFunctional:
     def test_draft_with_questions(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
+        test_activity: dict[str, Any],
     ):
         """Create a test draft with questions for feedback testing."""
         section_id = str(uuid.uuid4())
-        
+
         # Get the auto-created draft for this activity (created by trigger)
-        draft_resp = service_supabase_client.table("qgen_drafts").select("id").eq(
-            "activity_id", test_activity["id"]
-        ).execute()
-        
+        draft_resp = (
+            service_supabase_client.table("qgen_drafts")
+            .select("id")
+            .eq("activity_id", test_activity["id"])
+            .execute()
+        )
+
         if not draft_resp.data:
             pytest.skip("No draft found for test activity")
-        
+
         draft_id = draft_resp.data[0]["id"]
-        
+
         # Create section using typed model
         section_data = QgenDraftSectionsInsert(
             id=uuid.UUID(section_id),
@@ -105,7 +109,7 @@ class TestGetFeedbackFunctional:
         service_supabase_client.table("qgen_draft_sections").insert(
             section_data.model_dump(mode="json", exclude_none=True)
         ).execute()
-        
+
         # Create questions in the section (need at least 5 for feedback)
         question_ids = []
         for i in range(6):
@@ -116,7 +120,7 @@ class TestGetFeedbackFunctional:
                 activity_id=uuid.UUID(test_activity["id"]),
                 qgen_draft_section_id=uuid.UUID(section_id),
                 question_type=PublicQuestionTypeEnumEnum.MCQ4,
-                question_text=f"Test question {i+1}?",
+                question_text=f"Test question {i + 1}?",
                 option1="Option A",
                 option2="Option B",
                 option3="Option C",
@@ -130,35 +134,31 @@ class TestGetFeedbackFunctional:
             service_supabase_client.table("gen_questions").insert(
                 question_data.model_dump(mode="json", exclude_none=True)
             ).execute()
-        
+
         yield {
             "draft_id": draft_id,
             "section_id": section_id,
             "question_ids": question_ids,
         }
-        
+
         # Cleanup (draft is auto-created, deleted via cascade with activity)
-        service_supabase_client.table("gen_questions").delete().in_(
-            "id", question_ids
-        ).execute()
-        service_supabase_client.table("qgen_draft_sections").delete().eq(
-            "id", section_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().in_("id", question_ids).execute()
+        service_supabase_client.table("qgen_draft_sections").delete().eq("id", section_id).execute()
 
     def test_returns_feedback_for_valid_draft(
         self,
         test_client: TestClient,
-        test_draft_with_questions: Dict[str, Any],
+        test_draft_with_questions: dict[str, Any],
     ):
         """Test that the endpoint returns feedback for a valid draft with questions."""
         response = test_client.post(
             "/api/v1/qgen/get_feedback",
             json={"draft_id": test_draft_with_questions["draft_id"]},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Should return FeedbackList with .feedbacks list
         assert "feedbacks" in data
         assert isinstance(data["feedbacks"], list)
@@ -168,21 +168,24 @@ class TestGetFeedbackFunctional:
     def test_draft_with_few_questions(
         self,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
+        test_activity: dict[str, Any],
     ):
         """Create a test draft with too few questions."""
         section_id = str(uuid.uuid4())
-        
+
         # Get the auto-created draft for this activity (created by trigger)
-        draft_resp = service_supabase_client.table("qgen_drafts").select("id").eq(
-            "activity_id", test_activity["id"]
-        ).execute()
-        
+        draft_resp = (
+            service_supabase_client.table("qgen_drafts")
+            .select("id")
+            .eq("activity_id", test_activity["id"])
+            .execute()
+        )
+
         if not draft_resp.data:
             pytest.skip("No draft found for test activity")
-        
+
         draft_id = draft_resp.data[0]["id"]
-        
+
         # Create section using typed model
         section_data = QgenDraftSectionsInsert(
             id=uuid.UUID(section_id),
@@ -193,7 +196,7 @@ class TestGetFeedbackFunctional:
         service_supabase_client.table("qgen_draft_sections").insert(
             section_data.model_dump(mode="json", exclude_none=True)
         ).execute()
-        
+
         # Create only 2 questions (less than 5)
         question_ids = []
         for i in range(2):
@@ -204,7 +207,7 @@ class TestGetFeedbackFunctional:
                 activity_id=uuid.UUID(test_activity["id"]),
                 qgen_draft_section_id=uuid.UUID(section_id),
                 question_type=PublicQuestionTypeEnumEnum.MCQ4,
-                question_text=f"Test question {i+1}?",
+                question_text=f"Test question {i + 1}?",
                 option1="Option A",
                 option2="Option B",
                 option3="Option C",
@@ -218,31 +221,27 @@ class TestGetFeedbackFunctional:
             service_supabase_client.table("gen_questions").insert(
                 question_data.model_dump(mode="json", exclude_none=True)
             ).execute()
-        
+
         yield {
             "draft_id": draft_id,
             "section_id": section_id,
             "question_ids": question_ids,
         }
-        
+
         # Cleanup (draft is auto-created, deleted via cascade with activity)
-        service_supabase_client.table("gen_questions").delete().in_(
-            "id", question_ids
-        ).execute()
-        service_supabase_client.table("qgen_draft_sections").delete().eq(
-            "id", section_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().in_("id", question_ids).execute()
+        service_supabase_client.table("qgen_draft_sections").delete().eq("id", section_id).execute()
 
     def test_returns_400_for_insufficient_questions(
         self,
         test_client: TestClient,
-        test_draft_with_few_questions: Dict[str, Any],
+        test_draft_with_few_questions: dict[str, Any],
     ):
         """Test that the endpoint returns 400 when draft has less than 5 questions."""
         response = test_client.post(
             "/api/v1/qgen/get_feedback",
             json={"draft_id": test_draft_with_few_questions["draft_id"]},
         )
-        
+
         # Should return 400 for insufficient questions
         assert response.status_code == 400

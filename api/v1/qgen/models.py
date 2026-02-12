@@ -2,18 +2,19 @@
 Defines the Pydantic models relavant to qgen
 """
 
-from typing import Union, Optional, Dict, List, Type
-
 from pydantic import BaseModel, Field
 
 from supabase_dir import PublicQuestionTypeEnumEnum
 
+
 class SVG(BaseModel):
     svg: str = Field(description="SVG relavant to the question if needed")
 
+
 class Column(BaseModel):
     name: str = Field(description="Column header, e.g., 'Column A' or 'List I'")
-    items: List[str] = Field(description="Items in the column")
+    items: list[str] = Field(description="Items in the column")
+
 
 class MCQ4(BaseModel):
     """MCQ4 question schema for Gemini structured output."""
@@ -23,20 +24,12 @@ class MCQ4(BaseModel):
     option2: str = Field(description="Second option")
     option3: str = Field(description="Third option")
     option4: str = Field(description="Fourth option")
-    correct_mcq_option: int = Field(
-        description="Correct option (1-4)"
-    )
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    answer_text: Optional[str] = Field(
-        default=None, description="Answer text if applicable"
-    )
-    svgs: Optional[List[SVG]] = Field(
+    correct_mcq_option: int = Field(description="Correct option (1-4)")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    answer_text: str | None = Field(default=None, description="Answer text if applicable")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -44,40 +37,26 @@ class MCQ4(BaseModel):
 class MCQ4List(BaseModel):
     """List of MCQ4 questions."""
 
-    questions: List[MCQ4]
+    questions: list[MCQ4]
 
 
 class MSQ4(BaseModel):
     """MSQ4 question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    option1: Optional[str] = Field(default=None, description="First option")
-    option2: Optional[str] = Field(default=None, description="Second option")
-    option3: Optional[str] = Field(default=None, description="Third option")
-    option4: Optional[str] = Field(default=None, description="Fourth option")
-    msq_option1_answer: Optional[bool] = Field(
-        default=None, description="Is option 1 correct"
-    )
-    msq_option2_answer: Optional[bool] = Field(
-        default=None, description="Is option 2 correct"
-    )
-    msq_option3_answer: Optional[bool] = Field(
-        default=None, description="Is option 3 correct"
-    )
-    msq_option4_answer: Optional[bool] = Field(
-        default=None, description="Is option 4 correct"
-    )
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    answer_text: Optional[str] = Field(
-        default=None, description="Answer text if applicable"
-    )
-    svgs: Optional[List[SVG]] = Field(
+    question_text: str | None = Field(default=None, description="The question text")
+    option1: str | None = Field(default=None, description="First option")
+    option2: str | None = Field(default=None, description="Second option")
+    option3: str | None = Field(default=None, description="Third option")
+    option4: str | None = Field(default=None, description="Fourth option")
+    msq_option1_answer: bool | None = Field(default=None, description="Is option 1 correct")
+    msq_option2_answer: bool | None = Field(default=None, description="Is option 2 correct")
+    msq_option3_answer: bool | None = Field(default=None, description="Is option 3 correct")
+    msq_option4_answer: bool | None = Field(default=None, description="Is option 4 correct")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    answer_text: str | None = Field(default=None, description="Answer text if applicable")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -85,24 +64,18 @@ class MSQ4(BaseModel):
 class MSQ4List(BaseModel):
     """List of MSQ4 questions."""
 
-    questions: List[MSQ4]
+    questions: list[MSQ4]
 
 
 class FillInTheBlank(BaseModel):
     """Fill in the blank question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(
-        default=None, description="The question text with blank"
-    )
-    answer_text: Optional[str] = Field(default=None, description="The correct answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    question_text: str | None = Field(default=None, description="The question text with blank")
+    answer_text: str | None = Field(default=None, description="The correct answer")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -110,46 +83,37 @@ class FillInTheBlank(BaseModel):
 class FillInTheBlankList(BaseModel):
     """List of FillInTheBlank questions."""
 
-    questions: List[FillInTheBlank]
+    questions: list[FillInTheBlank]
 
 
 class TrueFalse(BaseModel):
     """True/False question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(
-        default=None, description="The statement to evaluate"
-    )
-    answer_text: Optional[str] = Field(default=None, description="True or False")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    question_text: str | None = Field(default=None, description="The statement to evaluate")
+    answer_text: str | None = Field(default=None, description="True or False")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
+
 
 class TrueFalseList(BaseModel):
     """List of TrueFalse questions."""
 
-    questions: List[TrueFalse]
+    questions: list[TrueFalse]
 
 
 class ShortAnswer(BaseModel):
     """Short answer question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    answer_text: Optional[str] = Field(default=None, description="The short answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    question_text: str | None = Field(default=None, description="The question text")
+    answer_text: str | None = Field(default=None, description="The short answer")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -157,22 +121,18 @@ class ShortAnswer(BaseModel):
 class ShortAnswerList(BaseModel):
     """List of ShortAnswer questions."""
 
-    questions: List[ShortAnswer]
+    questions: list[ShortAnswer]
 
 
 class LongAnswer(BaseModel):
     """Long answer question schema for Gemini structured output."""
 
-    question_text: Optional[str] = Field(default=None, description="The question text")
-    answer_text: Optional[str] = Field(default=None, description="The long answer")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
-    )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    question_text: str | None = Field(default=None, description="The question text")
+    answer_text: str | None = Field(default=None, description="The long answer")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
@@ -180,46 +140,50 @@ class LongAnswer(BaseModel):
 class LongAnswerList(BaseModel):
     """List of LongAnswer questions."""
 
-    questions: List[LongAnswer]
+    questions: list[LongAnswer]
 
 
 class MatchTheFollowing(BaseModel):
     "Match the following question schema for Gemini structured output."
-    question_text: Optional[str] = Field(default=None, description="The main question text, like Match The Following Things")
-    columns : List[Column] = Field(default = None, description= "List of columns for matching")
-    answer_text: Optional[str] = Field(default=None, description="The answer text")
-    explanation: Optional[str] = Field(
-        default=None, description="Explanation for the answer"
+
+    question_text: str | None = Field(
+        default=None, description="The main question text, like Match The Following Things"
     )
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    columns: list[Column] = Field(default=None, description="List of columns for matching")
+    answer_text: str | None = Field(default=None, description="The answer text")
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relavant to the question if needed"
     )
 
+
 class MatchTheFollowingList(BaseModel):
     """List of MatchTheFollowing questions."""
-    questions: List[MatchTheFollowing]
+
+    questions: list[MatchTheFollowing]
+
 
 # Type alias for any question type
-AllQuestions = Union[MCQ4, MSQ4, FillInTheBlank, TrueFalse, ShortAnswer, LongAnswer, MatchTheFollowing]
+AllQuestions = (
+    MCQ4 | MSQ4 | FillInTheBlank | TrueFalse | ShortAnswer | LongAnswer | MatchTheFollowing
+)
 
 
 # Mapping from question type key to GenAI schema (list wrapper)
-QUESTION_TYPE_TO_SCHEMA: Dict[str, Type[BaseModel]] = {
+QUESTION_TYPE_TO_SCHEMA: dict[str, type[BaseModel]] = {
     "mcq4": MCQ4List,
     "msq4": MSQ4List,
     "fill_in_the_blank": FillInTheBlankList,
     "true_false": TrueFalseList,
     "short_answer": ShortAnswerList,
     "long_answer": LongAnswerList,
-    "match_the_following" : MatchTheFollowingList,
+    "match_the_following": MatchTheFollowingList,
 }
 
 # Mapping from question type key to database enum value
-QUESTION_TYPE_TO_ENUM: Dict[str, PublicQuestionTypeEnumEnum] = {
+QUESTION_TYPE_TO_ENUM: dict[str, PublicQuestionTypeEnumEnum] = {
     "mcq4": PublicQuestionTypeEnumEnum.MCQ4,
     "msq4": PublicQuestionTypeEnumEnum.MSQ4,
     "fill_in_the_blank": PublicQuestionTypeEnumEnum.FILL_IN_THE_BLANKS,
@@ -236,7 +200,7 @@ QUESTION_TYPE_TO_FIELD = {
     "true_false": "total_true_falses",
     "short_answer": "total_short_answers",
     "long_answer": "total_long_answers",
-    "match_the_following":"match_the_following_count",
+    "match_the_following": "match_the_following_count",
 }
 
 
@@ -251,7 +215,7 @@ class FeedbackItem(BaseModel):
 class FeedbackList(BaseModel):
     """List of feedback items."""
 
-    feedbacks: List[FeedbackItem] = Field(
+    feedbacks: list[FeedbackItem] = Field(
         ..., description="List of feedback items with message and priority"
     )
 
@@ -270,39 +234,38 @@ class ExtractedQuestion(BaseModel):
     )
     question_text: str = Field(description="The question text")
     # MCQ4/MSQ4 options
-    option1: Optional[str] = Field(default=None, description="First option (for MCQ/MSQ)")
-    option2: Optional[str] = Field(default=None, description="Second option (for MCQ/MSQ)")
-    option3: Optional[str] = Field(default=None, description="Third option (for MCQ/MSQ)")
-    option4: Optional[str] = Field(default=None, description="Fourth option (for MCQ/MSQ)")
+    option1: str | None = Field(default=None, description="First option (for MCQ/MSQ)")
+    option2: str | None = Field(default=None, description="Second option (for MCQ/MSQ)")
+    option3: str | None = Field(default=None, description="Third option (for MCQ/MSQ)")
+    option4: str | None = Field(default=None, description="Fourth option (for MCQ/MSQ)")
     # MCQ4 answer
-    correct_mcq_option: Optional[int] = Field(
+    correct_mcq_option: int | None = Field(
         default=None, description="Correct option (1-4) for MCQ4"
     )
     # MSQ4 answers
-    msq_option1_answer: Optional[bool] = Field(
+    msq_option1_answer: bool | None = Field(
         default=None, description="Is option 1 correct (for MSQ4)"
     )
-    msq_option2_answer: Optional[bool] = Field(
+    msq_option2_answer: bool | None = Field(
         default=None, description="Is option 2 correct (for MSQ4)"
     )
-    msq_option3_answer: Optional[bool] = Field(
+    msq_option3_answer: bool | None = Field(
         default=None, description="Is option 3 correct (for MSQ4)"
     )
-    msq_option4_answer: Optional[bool] = Field(
+    msq_option4_answer: bool | None = Field(
         default=None, description="Is option 4 correct (for MSQ4)"
     )
     # Match the following fields
-    columns : List[Column] = Field(default = None, description= "List of columns for matching")
+    columns: list[Column] = Field(default=None, description="List of columns for matching")
     # Common fields
-    answer_text: Optional[str] = Field(
-        default=None, description="Answer text (for fill_in_blank, true_false, short_answer, long_answer)"
+    answer_text: str | None = Field(
+        default=None,
+        description="Answer text (for fill_in_blank, true_false, short_answer, long_answer)",
     )
-    explanation: Optional[str] = Field(default=None, description="Explanation for the answer")
-    hardness_level: Optional[str] = Field(
-        default=None, description="Difficulty: easy, medium, hard"
-    )
-    marks: Optional[int] = Field(default=None, description="Marks for this question")
-    svgs: Optional[List[SVG]] = Field(
+    explanation: str | None = Field(default=None, description="Explanation for the answer")
+    hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
+    marks: int | None = Field(default=None, description="Marks for this question")
+    svgs: list[SVG] | None = Field(
         default=None, description="List of SVGs relevant to the question if needed"
     )
 
@@ -310,6 +273,6 @@ class ExtractedQuestion(BaseModel):
 class ExtractedQuestionsList(BaseModel):
     """List of extracted questions of various types."""
 
-    questions: List[ExtractedQuestion] = Field(
+    questions: list[ExtractedQuestion] = Field(
         description="List of extracted questions from the file"
     )

@@ -16,6 +16,7 @@ to ensure test env vars are set BEFORE any app imports occur.
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 _backend_dir = Path(__file__).parent.parent
@@ -47,7 +48,7 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     """
     Log which environment file was loaded.
-    
+
     NOTE: Actual env loading happens at module import time (above).
     This hook just reports what happened.
     """
@@ -67,7 +68,7 @@ def use_live_gemini(request):
 def supabase_available():
     """
     Check if Supabase credentials are available.
-    
+
     Returns True if SUPABASE_URL and SUPABASE_SERVICE_KEY are set.
     Integration tests can use this to skip gracefully.
     """
@@ -79,14 +80,14 @@ def supabase_available():
 def pytest_collection_modifyitems(config, items):
     """
     Automatically add markers based on test location.
-    
+
     - tests/unit/* -> @pytest.mark.unit
     - tests/integration/* -> @pytest.mark.integration
     """
     for item in items:
         # Get the test file path relative to tests/
         test_path = str(item.fspath)
-        
+
         if "/tests/unit/" in test_path:
             item.add_marker(pytest.mark.unit)
         elif "/tests/integration/" in test_path:

@@ -2,18 +2,18 @@
 Prompt template for generating questions with granular concept association.
 """
 
-from typing import List, Dict, Optional
 from .common_instructions import COMMON_INSTRUCTIONS
 from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
+
 def generate_questions_with_concepts_prompt(
-    concepts: List[str],
-    concepts_descriptions: Dict[str, str],
+    concepts: list[str],
+    concepts_descriptions: dict[str, str],
     old_questions_on_concepts: list,
     n: int,
     question_type: str,
     difficulty: str,
-    instructions: Optional[str] = None,
+    instructions: str | None = None,
 ) -> str:
     """
     Generate prompt for creating questions for a batch of concepts.
@@ -38,11 +38,11 @@ def generate_questions_with_concepts_prompt(
 
     You have access to these concepts and their descriptions:
     {concepts_text}
-    
+
     Historical questions for reference: {old_questions_on_concepts}
-    
+
     Generate {n} questions of type {question_type} with difficulty level: {difficulty}
-    
+
     Instructions:
     - For EACH question, identify which specific concepts from the provided list are directly relevant and include them in the 'concepts' field as a list of concept names.
     - Each question MUST be associated with at least one concept from the provided list.

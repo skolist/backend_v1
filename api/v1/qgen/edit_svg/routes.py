@@ -1,7 +1,7 @@
 import logging
 
 import supabase
-from fastapi import Depends, status, HTTPException, Form
+from fastapi import Depends, Form, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -27,7 +27,7 @@ async def edit_svg(
 ):
     """
     API endpoint to edit an SVG using natural language instruction.
-    
+
     The AI will interpret the instruction and modify the SVG accordingly.
     Examples of instructions:
     - "Move the label 'r = 10 cm' to the left"
@@ -36,21 +36,16 @@ async def edit_svg(
     - "Add a label 'O' at the center"
     """
     user_id = user.id
-    
+
     # Check credits
     if not check_user_has_credits(user_id):
         return JSONResponse(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            content={"error": "Insufficient credits"}
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"}
         )
 
     logger.info(
         "Received edit SVG request",
-        extra={
-            "gen_image_id": gen_image_id,
-            "instruction": instruction,
-            "user_id": user_id
-        },
+        extra={"gen_image_id": gen_image_id, "instruction": instruction, "user_id": user_id},
     )
 
     try:
@@ -60,14 +55,11 @@ async def edit_svg(
             instruction=instruction,
             supabase_client=supabase_client,
         )
-        
+
         # Deduct credits (1 credit for SVG edit, less than question generation)
         deduct_user_credits(user_id, 1)
-        
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=result
-        )
+
+        return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
     except SVGEditError as e:
         logger.error(f"SVG edit error: {e}")

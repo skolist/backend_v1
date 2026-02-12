@@ -7,12 +7,12 @@ Architecture:
     3. regenerate_question() - Retry wrapper (5 retries) + updates Supabase
 """
 
-import os
 import logging
+import os
 
 import supabase
-from pydantic import BaseModel, Field
 from google import genai
+from pydantic import BaseModel, Field
 
 from api.v1.qgen.models import AllQuestions
 from api.v1.qgen.prompts import regenerate_question_prompt
@@ -40,11 +40,13 @@ class RegeneratedQuestion(BaseModel):
 
 class QuestionProcessingError(Exception):
     """Raised when question processing fails after all retries."""
+
     pass
 
 
 class QuestionValidationError(Exception):
     """Raised when question validation fails."""
+
     pass
 
 
@@ -76,7 +78,7 @@ class RegenerateService:
         Process a question by calling Gemini API once.
         This function makes a single API call without any retry logic.
         """
-        prefix = _log_prefix(retry_idx)
+        _log_prefix(retry_idx)  # For consistent logging format
 
         logger.debug(
             "Processing regenerate for question",
@@ -119,14 +121,16 @@ class RegenerateService:
         Process and validate a question.
         Calls process_question() and then validates the response.
         """
-        prefix = _log_prefix(retry_idx)
+        _log_prefix(retry_idx)  # For consistent logging format
 
         logger.debug(
             "Starting regenerate processing and validation",
             extra={"retry_idx": retry_idx},
         )
 
-        response = await RegenerateService.process_question(gemini_client, gen_question_data, retry_idx)
+        response = await RegenerateService.process_question(
+            gemini_client, gen_question_data, retry_idx
+        )
 
         logger.debug(
             "Parsing Gemini response",
@@ -147,7 +151,9 @@ class RegenerateService:
                     "error": str(parse_error),
                 },
             )
-            raise QuestionValidationError(f"Failed to parse response: {parse_error}")
+            raise QuestionValidationError(
+                f"Failed to parse response: {parse_error}"
+            ) from parse_error
 
         if not regenerated_question.question_text:
             logger.warning(
@@ -174,7 +180,7 @@ class RegenerateService:
         Attempt to process question with retry logic and update Supabase.
         """
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        
+
         logger.debug(
             "Starting regenerate retry wrapper",
             extra={"max_retries": max_retries},
@@ -184,7 +190,7 @@ class RegenerateService:
 
         for attempt in range(max_retries):
             retry_idx = attempt + 1
-            prefix = _log_prefix(retry_idx)
+            _log_prefix(retry_idx)  # For consistent logging format
 
             try:
                 logger.debug(
@@ -206,10 +212,10 @@ class RegenerateService:
 
                 # Update the question in the database
                 update_data = regenerated_question.model_dump(exclude_none=True)
-                
+
                 # Extract SVGs before updating gen_questions (svgs is not a column in gen_questions)
                 svg_list = update_data.pop("svgs", None)
-                
+
                 # Map 'columns' to 'match_the_following_columns' if it exists (for match_the_following type)
                 if "columns" in update_data:
                     cols = update_data.pop("columns")
@@ -219,30 +225,34 @@ class RegenerateService:
                             if isinstance(col, dict):
                                 dict_cols[col["name"]] = col["items"]
                             else:
-                                dict_cols[getattr(col, 'name', '')] = getattr(col, 'items', [])
+                                dict_cols[getattr(col, "name", "")] = getattr(col, "items", [])
                         update_data["match_the_following_columns"] = dict_cols
                     else:
                         update_data["match_the_following_columns"] = cols
-                
+
                 # Create new version before updating question
                 create_new_version_on_update(supabase_client, gen_question_id, update_data)
-                
+
                 supabase_client.table("gen_questions").update(update_data).eq(
                     "id", gen_question_id
                 ).execute()
-                
+
                 # Insert SVGs into gen_images table if present
                 if svg_list:
-                    logger.debug(f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found")
-                    
+                    logger.debug(
+                        f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found"
+                    )
+
                     # First, delete existing SVGs for this question (to replace with new ones)
                     supabase_client.table("gen_images").delete().eq(
                         "gen_question_id", gen_question_id
                     ).execute()
-                    
+
                     for position, svg_item in enumerate(svg_list, start=1):
                         try:
-                            svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
+                            svg_string = (
+                                svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
+                            )
                             if svg_string:
                                 gen_image = GenImagesInsert(
                                     gen_question_id=gen_question_id,
@@ -253,7 +263,9 @@ class RegenerateService:
                                     gen_image.model_dump(mode="json", exclude_none=True)
                                 ).execute()
                         except Exception as svg_error:
-                            logger.warning(f"Failed to insert SVG for question {gen_question_id}: {svg_error}")
+                            logger.warning(
+                                f"Failed to insert SVG for question {gen_question_id}: {svg_error}"
+                            )
 
                 logger.debug(
                     "Database update completed successfully",

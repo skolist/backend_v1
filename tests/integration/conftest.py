@@ -10,7 +10,8 @@ The --gemini-live option is defined in tests/conftest.py.
 
 import os
 import uuid
-from typing import Any, Dict, Generator, List
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -18,10 +19,9 @@ from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from supabase import Client, create_client
 
+from api.v1.qgen.models import MCQ4, FillInTheBlank, ShortAnswer, TrueFalse
 from app import create_app
 from supabase_dir import PublicProductTypeEnumEnum
-from api.v1.qgen.models import MCQ4, ShortAnswer, TrueFalse, FillInTheBlank
-
 
 # ============================================================================
 # TEST USER CREDENTIALS (seeded by skolist-db/seed_users.py)
@@ -80,16 +80,12 @@ def create_mock_true_false(question_text: str | None = None) -> TrueFalse:
 def create_mock_fill_in_blank(question_text: str | None = None) -> FillInTheBlank:
     """Create a mock FillInTheBlank question."""
     return FillInTheBlank(
-        question_text=question_text
-        or "The formula for kinetic energy is KE = 1/2 * m * ___",
+        question_text=question_text or "The formula for kinetic energy is KE = 1/2 * m * ___",
         answer_text="v^2",
         explanation="Velocity squared completes the kinetic energy formula.",
         hardness_level="medium",
         marks=1,
     )
-
-    distribution = []
-    total_concepts = len(concept_names)
 
 
 # ============================================================================
@@ -132,7 +128,7 @@ class MockGeminiModels:
         """Mock generate_content that returns appropriate responses based on schema."""
         schema = config.get("response_schema")
         schema_name = getattr(schema, "__name__", str(schema)) if schema else ""
-        
+
         # Convert contents to string for pattern matching
         # Handle both string and list of Part objects
         if isinstance(contents, list):
@@ -142,11 +138,13 @@ class MockGeminiModels:
 
         # Handle edit_svg endpoint (unstructured response - no schema, uses .text)
         # This endpoint doesn't use response_schema and expects raw text response
-        if "response_schema" not in config and ("svg" in contents_str or "edit" in contents_str or "circle" in contents_str):
-            mock_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+        if "response_schema" not in config and (
+            "svg" in contents_str or "edit" in contents_str or "circle" in contents_str
+        ):
+            mock_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
     <circle cx="100" cy="100" r="75" fill="blue"/>
     <text x="100" y="100" text-anchor="middle">r = 75</text>
-</svg>'''
+</svg>"""
             return MockParsedResponse(None, text=mock_svg)
 
         # Handle auto-correct endpoint (returns wrapper with .question)
@@ -154,17 +152,13 @@ class MockGeminiModels:
             if "short_answer" in contents_str:
 
                 class QuestionWrapper:
-                    question = create_mock_short_answer(
-                        "What is Newton's first law of motion?"
-                    )
+                    question = create_mock_short_answer("What is Newton's first law of motion?")
 
                 return MockParsedResponse(QuestionWrapper())
             else:
 
                 class QuestionWrapper:
-                    question = create_mock_mcq4(
-                        "What is the formula for kinetic energy?"
-                    )
+                    question = create_mock_mcq4("What is the formula for kinetic energy?")
 
                 return MockParsedResponse(QuestionWrapper())
 
@@ -190,11 +184,16 @@ class MockGeminiModels:
         # Handle get_feedback endpoint (returns FeedbackList with .feedbacks)
         if "FeedbackList" in schema_name or "feedback" in contents_str.lower():
             from api.v1.qgen.models import FeedbackItem, FeedbackList
-            
+
             feedback_list = FeedbackList(
                 feedbacks=[
-                    FeedbackItem(message="Consider adding more variety in question difficulty levels.", priority=7),
-                    FeedbackItem(message="Some questions could benefit from clearer wording.", priority=5),
+                    FeedbackItem(
+                        message="Consider adding more variety in question difficulty levels.",
+                        priority=7,
+                    ),
+                    FeedbackItem(
+                        message="Some questions could benefit from clearer wording.", priority=5
+                    ),
                 ]
             )
             return MockParsedResponse(feedback_list)
@@ -253,20 +252,14 @@ def mock_gemini_client(use_live_gemini):
         yield
     else:
         # Patch genai.Client in all modules that use it
-        with patch(
-            "api.v1.qgen.generate_questions.routes.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.qgen.auto_correct.service.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.qgen.regenerate_with_prompt.routes.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.qgen.get_feedback.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.qgen.edit_svg.service.genai.Client", MockGeminiClient
-        ), patch(
-            "api.v1.bank.router.genai.Client", MockGeminiClient
+        with (
+            patch("api.v1.qgen.generate_questions.routes.genai.Client", MockGeminiClient),
+            patch("api.v1.qgen.auto_correct.service.genai.Client", MockGeminiClient),
+            patch("api.v1.qgen.regenerate_question.genai.Client", MockGeminiClient),
+            patch("api.v1.qgen.regenerate_with_prompt.routes.genai.Client", MockGeminiClient),
+            patch("api.v1.qgen.get_feedback.genai.Client", MockGeminiClient),
+            patch("api.v1.qgen.edit_svg.service.genai.Client", MockGeminiClient),
+            patch("api.v1.bank.router.genai.Client", MockGeminiClient),
         ):
             yield
 
@@ -314,7 +307,7 @@ def _get_user_id(auth_response) -> str | None:
 
 
 @pytest.fixture(scope="session")
-def env(request) -> Dict[str, str]:
+def env(request) -> dict[str, str]:
     """
     Load and validate required environment variables for integration tests.
 
@@ -358,7 +351,7 @@ def env(request) -> Dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def service_supabase_client(env: Dict[str, str]) -> Client:
+def service_supabase_client(env: dict[str, str]) -> Client:
     """
     Create a Supabase client with service role key.
     Used for test data setup/teardown operations.
@@ -367,13 +360,13 @@ def service_supabase_client(env: Dict[str, str]) -> Client:
 
 
 @pytest.fixture(scope="session")
-def auth_session(env: Dict[str, str], service_supabase_client: Client) -> Dict[str, Any]:
+def auth_session(env: dict[str, str], service_supabase_client: Client) -> dict[str, Any]:
     """
     Authenticate as test user and return session info.
-    
+
     Uses hardcoded credentials from TEST_USER_EMAIL/TEST_USER_PASSWORD constants.
     These users are seeded by skolist-db/seed_users.py.
-    
+
     Also ensures the user exists in public.users as a non-admin (private_user).
     """
     client = create_client(env["SUPABASE_URL"], env["SUPABASE_ANON_KEY"])
@@ -395,12 +388,14 @@ def auth_session(env: Dict[str, str], service_supabase_client: Client) -> Dict[s
 
     # Ensure user exists in public.users as non-admin with credits
     # This resets any admin status from previous test runs
-    service_supabase_client.table("users").upsert({
-        "id": user_id,
-        "email": TEST_USER_EMAIL,
-        "user_type": "private_user",
-        "credits": 10000,  # Give test user plenty of credits
-    }).execute()
+    service_supabase_client.table("users").upsert(
+        {
+            "id": user_id,
+            "email": TEST_USER_EMAIL,
+            "user_type": "private_user",
+            "credits": 10000,  # Give test user plenty of credits
+        }
+    ).execute()
 
     return {
         "access_token": token,
@@ -417,20 +412,20 @@ def auth_session(env: Dict[str, str], service_supabase_client: Client) -> Dict[s
 def app(service_supabase_client: Client):
     """
     Create the FastAPI application instance with test Supabase client.
-    
+
     Overrides get_supabase_client to use the same Supabase instance that
     the tests authenticate against, ensuring JWT validation succeeds.
     """
     from api.v1.auth import get_supabase_client
-    
+
     # Clear any cached client that may point to a different Supabase instance
     get_supabase_client.cache_clear()
-    
+
     app_instance = create_app()
-    
+
     # Override the get_supabase_client dependency to return our test client
     app_instance.dependency_overrides[get_supabase_client] = lambda: service_supabase_client
-    
+
     # Also patch the function directly since require_supabase_user calls it directly
     with patch("api.v1.auth.get_supabase_client", return_value=service_supabase_client):
         yield app_instance
@@ -440,7 +435,7 @@ def app(service_supabase_client: Client):
 def _lifespan_client(app) -> Generator[TestClient, None, None]:
     """
     Session-scoped TestClient that properly triggers app lifespan events.
-    
+
     This ensures BrowserService and other startup/shutdown code runs once
     at the start/end of the test session.
     """
@@ -449,10 +444,10 @@ def _lifespan_client(app) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture(scope="session")
-def test_client(_lifespan_client: TestClient, auth_session: Dict[str, Any]) -> TestClient:
+def test_client(_lifespan_client: TestClient, auth_session: dict[str, Any]) -> TestClient:
     """
     Create an authenticated TestClient.
-    
+
     Reuses the lifespan client and adds authentication headers.
     """
     _lifespan_client.headers["Authorization"] = f"Bearer {auth_session['access_token']}"
@@ -463,7 +458,7 @@ def test_client(_lifespan_client: TestClient, auth_session: Dict[str, Any]) -> T
 def unauthenticated_test_client(_lifespan_client: TestClient) -> TestClient:
     """
     Create a TestClient without authentication headers.
-    
+
     Temporarily clears auth headers for this test.
     """
     # Save and clear auth header
@@ -495,9 +490,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
         # board -> school_class -> subject -> chapter -> topic
 
         # Check for existing board
-        board_resp = (
-            service_supabase_client.table("boards").select("id").limit(1).execute()
-        )
+        board_resp = service_supabase_client.table("boards").select("id").limit(1).execute()
         if board_resp.data:
             board_id = board_resp.data[0]["id"]
         else:
@@ -507,12 +500,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
             ).execute()
 
         # Check for existing school_class
-        class_resp = (
-            service_supabase_client.table("school_classes")
-            .select("id")
-            .limit(1)
-            .execute()
-        )
+        class_resp = service_supabase_client.table("school_classes").select("id").limit(1).execute()
         if class_resp.data:
             class_id = class_resp.data[0]["id"]
         else:
@@ -527,9 +515,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
             ).execute()
 
         # Check for existing subject
-        subject_resp = (
-            service_supabase_client.table("subjects").select("id").limit(1).execute()
-        )
+        subject_resp = service_supabase_client.table("subjects").select("id").limit(1).execute()
         if subject_resp.data:
             subject_id = subject_resp.data[0]["id"]
         else:
@@ -539,9 +525,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
             ).execute()
 
         # Check for existing chapter
-        chapter_resp = (
-            service_supabase_client.table("chapters").select("id").limit(1).execute()
-        )
+        chapter_resp = service_supabase_client.table("chapters").select("id").limit(1).execute()
         if chapter_resp.data:
             chapter_id = chapter_resp.data[0]["id"]
         else:
@@ -570,7 +554,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
 def test_concepts(
     service_supabase_client: Client,
     test_topic_id: str,
-) -> Generator[List[Dict[str, Any]], None, None]:
+) -> Generator[list[dict[str, Any]], None, None]:
     """
     Create test concepts in Supabase and clean up after test.
     """
@@ -605,8 +589,8 @@ def test_concepts(
 @pytest.fixture
 def test_activity(
     service_supabase_client: Client,
-    auth_session: Dict[str, Any],
-) -> Generator[Dict[str, Any], None, None]:
+    auth_session: dict[str, Any],
+) -> Generator[dict[str, Any], None, None]:
     """
     Create a test activity in Supabase and clean up after test.
     """
@@ -621,9 +605,7 @@ def test_activity(
     }
 
     # Insert activity
-    response = (
-        service_supabase_client.table("activities").insert(activity_data).execute()
-    )
+    response = service_supabase_client.table("activities").insert(activity_data).execute()
 
     yield response.data[0]
 
@@ -654,16 +636,14 @@ def test_activity(
 @pytest.fixture
 def test_bank_questions(
     service_supabase_client: Client,
-    test_concepts: List[Dict[str, Any]],
-) -> Generator[List[Dict[str, Any]], None, None]:
+    test_concepts: list[dict[str, Any]],
+) -> Generator[list[dict[str, Any]], None, None]:
     """
     Create test bank questions (historical questions) for the concepts.
     These are used as reference data for question generation.
     """
     # Get a subject_id for the bank questions
-    subject_resp = (
-        service_supabase_client.table("subjects").select("id").limit(1).execute()
-    )
+    subject_resp = service_supabase_client.table("subjects").select("id").limit(1).execute()
 
     if not subject_resp.data:
         pytest.skip("No subjects available for bank questions")
@@ -702,11 +682,7 @@ def test_bank_questions(
     ]
 
     # Insert bank questions
-    response = (
-        service_supabase_client.table("bank_questions")
-        .insert(bank_questions_data)
-        .execute()
-    )
+    response = service_supabase_client.table("bank_questions").insert(bank_questions_data).execute()
 
     # Create mappings between bank questions and concepts
     mappings_data = [
@@ -722,9 +698,7 @@ def test_bank_questions(
         },
     ]
 
-    service_supabase_client.table("bank_questions_concepts_maps").insert(
-        mappings_data
-    ).execute()
+    service_supabase_client.table("bank_questions_concepts_maps").insert(mappings_data).execute()
 
     yield response.data
 
@@ -733,6 +707,4 @@ def test_bank_questions(
         "bank_question_id", question_ids
     ).execute()
 
-    service_supabase_client.table("bank_questions").delete().in_(
-        "id", question_ids
-    ).execute()
+    service_supabase_client.table("bank_questions").delete().in_("id", question_ids).execute()

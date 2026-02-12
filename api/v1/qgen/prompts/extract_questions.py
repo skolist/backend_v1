@@ -2,13 +2,11 @@
 Prompt template for extracting questions from files (images/PDFs).
 """
 
-from typing import Optional
-
 from .common_instructions import COMMON_INSTRUCTIONS
 from .svg_instructions import COMMON_SVG_INSTRUCTIONS
 
 
-def extract_questions_prompt(custom_prompt: Optional[str] = None) -> str:
+def extract_questions_prompt(custom_prompt: str | None = None) -> str:
     """
     Generate prompt to extract questions from a file.
 
@@ -51,5 +49,5 @@ If a question has sub-parts, treat each sub-part as a separate question.
 
     if custom_prompt and custom_prompt.strip():
         return f"{base_prompt}\n\nAdditional Instructions from user:\n{custom_prompt}"
-    
+
     return base_prompt

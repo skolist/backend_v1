@@ -4,7 +4,7 @@ FastAPI dependency to require and validate Supabase user via JWT.
 
 import logging
 from functools import lru_cache
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import Header, HTTPException, Request, status
 from supabase import Client, create_client
@@ -14,7 +14,7 @@ from config.settings import SUPABASE_SERVICE_KEY, SUPABASE_URL
 logger = logging.getLogger(__name__)
 
 
-def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+def _extract_bearer_token(authorization: str | None) -> str | None:
     """
     Extracts the bearer token from the Authorization header.
     """
@@ -46,7 +46,7 @@ def get_supabase_client() -> Client:
 
 def require_supabase_user(
     request: Request,
-    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
 ) -> Any:
     """FastAPI dependency: validates request JWT via Supabase Auth.
 

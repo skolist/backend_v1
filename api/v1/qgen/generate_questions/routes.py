@@ -1,21 +1,22 @@
 import logging
 import os
 import uuid
-from typing import List, Literal, Optional, Dict
+from typing import Literal
 
-from fastapi import APIRouter, Depends, status
-from fastapi.responses import Response
-from pydantic import BaseModel, Field, model_validator
-from google import genai
 import supabase
+from fastapi import Depends, status
+from fastapi.responses import Response
+from google import genai
+from pydantic import BaseModel, Field, model_validator
 
 from api.v1.auth import get_supabase_client, require_supabase_user
+
 from ..credits import check_user_has_credits, deduct_user_credits
+from .batchification import Batch, build_batches_end_to_end
 from .service import (
     BatchProcessingContext,
     process_all_batches,
 )
-from .batchification import build_batches_end_to_end, Batch
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +24,36 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION SCHEMAS
 # ============================================================================
 
+
 class QuestionTypeConfig(BaseModel):
     """Question Type Configuration for the request."""
+
     type: Literal[
-        "mcq4", "short_answer", "long_answer", "true_false", "fill_in_the_blank", "msq4", "match_the_following", "solved_examples", "exercise_questions"
+        "mcq4",
+        "short_answer",
+        "long_answer",
+        "true_false",
+        "fill_in_the_blank",
+        "msq4",
+        "match_the_following",
+        "solved_examples",
+        "exercise_questions",
     ]
     count: int
 
+
 class DifficultyDistribution(BaseModel):
     """Difficulty Distribution Configuration."""
+
     easy: int = Field(..., ge=0, le=100)
     medium: int = Field(..., ge=0, le=100)
     hard: int = Field(..., ge=0, le=100)
 
+
 class QuestionConfig(BaseModel):
     """Question Configuration."""
-    question_types: List[QuestionTypeConfig]
+
+    question_types: list[QuestionTypeConfig]
     difficulty_distribution: DifficultyDistribution
 
     @model_validator(mode="after")
@@ -49,28 +64,36 @@ class QuestionConfig(BaseModel):
             raise ValueError("Total number of questions must be between 1 and 50.")
         return self
 
+
 class GenerateQuestionsRequest(BaseModel):
     """Generate Questions Request."""
+
     activity_id: uuid.UUID
-    concept_ids: List[uuid.UUID]
+    concept_ids: list[uuid.UUID]
     config: QuestionConfig
-    instructions: Optional[str] = None
+    instructions: str | None = None
+
 
 # ============================================================================
 # HELPERS
 # ============================================================================
 
-def extract_question_type_counts_dict(request: GenerateQuestionsRequest) -> Dict[str, int]:
+
+def extract_question_type_counts_dict(request: GenerateQuestionsRequest) -> dict[str, int]:
     return {qt.type: qt.count for qt in request.config.question_types if qt.count > 0}
 
-def extract_difficulty_percentages(difficulty_distribution: DifficultyDistribution) -> Dict[str, float]:
+
+def extract_difficulty_percentages(
+    difficulty_distribution: DifficultyDistribution,
+) -> dict[str, float]:
     return {
         "easy": difficulty_distribution.easy,
         "medium": difficulty_distribution.medium,
         "hard": difficulty_distribution.hard,
     }
 
-def batchify_request(request: GenerateQuestionsRequest, concept_names: List[str]) -> List[Batch]:
+
+def batchify_request(request: GenerateQuestionsRequest, concept_names: list[str]) -> list[Batch]:
     question_type_counts = extract_question_type_counts_dict(request)
     difficulty_percentages = extract_difficulty_percentages(request.config.difficulty_distribution)
 
@@ -86,9 +109,11 @@ def batchify_request(request: GenerateQuestionsRequest, concept_names: List[str]
         custom_instruction_mode="first",
     )
 
+
 # ============================================================================
 # ROUTE
 # ============================================================================
+
 
 async def generate_questions(
     request: GenerateQuestionsRequest,
@@ -98,9 +123,11 @@ async def generate_questions(
     """Generate questions based on concepts and configuration."""
     try:
         user_id = user.id
-        
+
         if not check_user_has_credits(user_id):
-            return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
+            return Response(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits"
+            )
 
         logger.debug(f"Custom instruction received: {request.instructions}")
 
@@ -140,7 +167,7 @@ async def generate_questions(
         # Batchification
         concept_names = [concept["name"] for concept in concepts]
         batches = batchify_request(request, concept_names)
-        
+
         logger.debug(f"Total batches created: {len(batches)}")
 
         # Snapshot existing question IDs before inserting new ones
@@ -172,21 +199,20 @@ async def generate_questions(
             supabase_client=supabase_client,
             max_retries=3,
         )
-        
+
         # Mark pre-existing questions in this activity as no longer new
         if existing_question_ids:
             try:
-                supabase_client.table("gen_questions") \
-                    .update({"is_new": False}) \
-                    .in_("id", existing_question_ids) \
-                    .execute()
+                supabase_client.table("gen_questions").update({"is_new": False}).in_(
+                    "id", existing_question_ids
+                ).execute()
             except Exception as e:
                 logger.warning(f"Failed to mark questions as not new: {e}")
 
         # Credits deduction
         questions_inserted = result.get("questions_inserted", 0)
         credits_to_deduct = questions_inserted * 5
-        
+
         if credits_to_deduct > 0:
             deduct_user_credits(user_id, credits_to_deduct)
 

@@ -6,12 +6,11 @@ the full end-to-end question generation flow with the new batchification logic.
 """
 
 import uuid
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from supabase import Client
-
 
 # ============================================================================
 # SANITY CHECK - VERIFY AUTH WORKS
@@ -59,8 +58,8 @@ class TestGenerateQuestionsAuth:
     def test_returns_401_without_auth_token(
         self,
         unauthenticated_test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 401 when no auth token is provided.
@@ -84,8 +83,8 @@ class TestGenerateQuestionsAuth:
     def test_returns_401_with_invalid_token(
         self,
         app,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 401 with an invalid token.
@@ -121,7 +120,7 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_with_invalid_activity_id(
         self,
         test_client: TestClient,
-        test_concepts: List[Dict[str, Any]],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 422 for invalid activity_id format.
@@ -145,8 +144,8 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_with_invalid_question_type(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 422 for invalid question type.
@@ -170,8 +169,8 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_with_missing_config(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 422 when config is missing.
@@ -191,7 +190,7 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_with_empty_concept_ids(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
+        test_activity: dict[str, Any],
     ):
         """
         Test that the endpoint handles empty concept_ids list.
@@ -215,8 +214,8 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_when_total_questions_is_zero(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 422 when total questions is 0.
@@ -241,8 +240,8 @@ class TestGenerateQuestionsValidation:
     def test_returns_422_when_total_questions_exceeds_50(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint returns 422 when total questions exceeds 50.
@@ -270,8 +269,8 @@ class TestGenerateQuestionsValidation:
     def test_accepts_exactly_1_question(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint accepts exactly 1 question (lower boundary).
@@ -296,8 +295,8 @@ class TestGenerateQuestionsValidation:
     def test_accepts_exactly_50_questions(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint accepts exactly 50 questions (upper boundary).
@@ -337,9 +336,9 @@ class TestGenerateQuestionsSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],  # Ensure bank questions exist
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],  # Ensure bank questions exist
     ):
         """
         Test that MCQ4 questions are generated and stored in database.
@@ -383,9 +382,9 @@ class TestGenerateQuestionsSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that multiple question types can be generated in one request.
@@ -428,9 +427,9 @@ class TestGenerateQuestionsSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that concept-question mappings are created in gen_questions_concepts_maps.
@@ -485,9 +484,9 @@ class TestGenerateQuestionsSuccess:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that difficulty distribution is correctly applied across batches.
@@ -535,7 +534,7 @@ class TestGenerateQuestionsEdgeCases:
     def test_handles_nonexistent_concepts_gracefully(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
+        test_activity: dict[str, Any],
     ):
         """
         Test that the endpoint handles non-existent concept IDs gracefully.
@@ -562,9 +561,9 @@ class TestGenerateQuestionsEdgeCases:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that batchification correctly handles single concept with multiple questions.
@@ -604,9 +603,9 @@ class TestGenerateQuestionsEdgeCases:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that batchification handles case where concepts > questions.
@@ -643,9 +642,9 @@ class TestGenerateQuestionsWithInstructions:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that the endpoint accepts and processes instructions parameter.
@@ -682,8 +681,8 @@ class TestGenerateQuestionsWithInstructions:
     def test_accepts_empty_instructions(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint accepts empty string for instructions.
@@ -709,8 +708,8 @@ class TestGenerateQuestionsWithInstructions:
     def test_accepts_null_instructions(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint accepts null for instructions.
@@ -736,8 +735,8 @@ class TestGenerateQuestionsWithInstructions:
     def test_works_without_instructions_field(
         self,
         test_client: TestClient,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
     ):
         """
         Test that the endpoint works when instructions field is omitted entirely.
@@ -765,9 +764,9 @@ class TestGenerateQuestionsWithInstructions:
         self,
         test_client: TestClient,
         service_supabase_client: Client,
-        test_activity: Dict[str, Any],
-        test_concepts: List[Dict[str, Any]],
-        test_bank_questions: List[Dict[str, Any]],
+        test_activity: dict[str, Any],
+        test_concepts: list[dict[str, Any]],
+        test_bank_questions: list[dict[str, Any]],
     ):
         """
         Test that instructions with special characters are handled properly.

@@ -222,9 +222,7 @@ class GenQuestionVersionsBaseSchema(CustomModel):
     is_active: bool
     is_deleted: bool
     marks: int
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(default=None)
     msq_option2_answer: bool | None = Field(default=None)
     msq_option3_answer: bool | None = Field(default=None)
@@ -246,12 +244,8 @@ class GenQuestionsBaseSchema(CustomModel):
 
     # Columns
     activity_id: UUID4
-    answer_text: str = Field(
-        description="Answer for the Generated question. Not For MCQs and MSQs"
-    )
-    correct_mcq_option: int | None = Field(
-        default=None, description="can be 1 or 2 or 3 or 4"
-    )
+    answer_text: str = Field(description="Answer for the Generated question. Not For MCQs and MSQs")
+    correct_mcq_option: int | None = Field(default=None, description="can be 1 or 2 or 3 or 4")
     created_at: datetime.datetime
     explanation: str | None = Field(
         default=None, description="explanation for the question and answer"
@@ -265,9 +259,7 @@ class GenQuestionsBaseSchema(CustomModel):
     )
     is_solved_example: bool
     marks: int
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(
         default=None, description="Describes if the option is correct or incorrect"
     )
@@ -804,9 +796,7 @@ class GenQuestionVersionsInsert(CustomModelInsert):
     gen_question_id: UUID4 | None = Field(default=None)
     is_active: bool | None = Field(default=None)
     is_deleted: bool | None = Field(default=None)
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(default=None)
     msq_option2_answer: bool | None = Field(default=None)
     msq_option3_answer: bool | None = Field(default=None)
@@ -850,17 +840,13 @@ class GenQuestionsInsert(CustomModelInsert):
 
     # Required fields
     activity_id: UUID4
-    answer_text: str = Field(
-        description="Answer for the Generated question. Not For MCQs and MSQs"
-    )
+    answer_text: str = Field(description="Answer for the Generated question. Not For MCQs and MSQs")
     hardness_level: PublicHardnessLevelEnumEnum
     marks: int
     question_type: PublicQuestionTypeEnumEnum
 
     # Optional fields
-    correct_mcq_option: int | None = Field(
-        default=None, description="can be 1 or 2 or 3 or 4"
-    )
+    correct_mcq_option: int | None = Field(default=None, description="can be 1 or 2 or 3 or 4")
     created_at: datetime.datetime | None = Field(default=None)
     explanation: str | None = Field(
         default=None, description="explanation for the question and answer"
@@ -873,9 +859,7 @@ class GenQuestionsInsert(CustomModelInsert):
         description="If the question is in a draft, then this variable will tell if to add a page break after this question in the pdf being generated",
     )
     is_solved_example: bool | None = Field(default=None)
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(
         default=None, description="Describes if the option is correct or incorrect"
     )
@@ -1519,9 +1503,7 @@ class GenQuestionVersionsUpdate(CustomModelUpdate):
     is_active: bool | None = Field(default=None)
     is_deleted: bool | None = Field(default=None)
     marks: int | None = Field(default=None)
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(default=None)
     msq_option2_answer: bool | None = Field(default=None)
     msq_option3_answer: bool | None = Field(default=None)
@@ -1570,9 +1552,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
         default=None,
         description="Answer for the Generated question. Not For MCQs and MSQs",
     )
-    correct_mcq_option: int | None = Field(
-        default=None, description="can be 1 or 2 or 3 or 4"
-    )
+    correct_mcq_option: int | None = Field(default=None, description="can be 1 or 2 or 3 or 4")
     created_at: datetime.datetime | None = Field(default=None)
     explanation: str | None = Field(
         default=None, description="explanation for the question and answer"
@@ -1587,9 +1567,7 @@ class GenQuestionsUpdate(CustomModelUpdate):
     )
     is_solved_example: bool | None = Field(default=None)
     marks: int | None = Field(default=None)
-    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(
-        default=None
-    )
+    match_the_following_columns: dict | list[dict] | list[Any] | Json | None = Field(default=None)
     msq_option1_answer: bool | None = Field(
         default=None, description="Describes if the option is correct or incorrect"
     )
@@ -1989,9 +1967,7 @@ class BankQuestions(BankQuestionsBaseSchema):
     # Foreign Keys
     subject: Subjects | None = Field(default=None)
     chapter: Chapters | None = Field(default=None)
-    bank_questions_concepts_maps: list[BankQuestionsConceptsMaps] | None = Field(
-        default=None
-    )
+    bank_questions_concepts_maps: list[BankQuestionsConceptsMaps] | None = Field(default=None)
 
 
 class BankQuestionsConceptsMaps(BankQuestionsConceptsMapsBaseSchema):
@@ -2036,14 +2012,10 @@ class Concepts(ConceptsBaseSchema):
 
     # Foreign Keys
     topic: Topics | None = Field(default=None)
-    bank_questions_concepts_maps: list[BankQuestionsConceptsMaps] | None = Field(
-        default=None
-    )
+    bank_questions_concepts_maps: list[BankQuestionsConceptsMaps] | None = Field(default=None)
     concepts_activities_map: ConceptsActivitiesMaps | None = Field(default=None)
     gen_questions_concepts_map: GenQuestionsConceptsMaps | None = Field(default=None)
-    generation_pane_concepts_maps: list[GenerationPaneConceptsMaps] | None = Field(
-        default=None
-    )
+    generation_pane_concepts_maps: list[GenerationPaneConceptsMaps] | None = Field(default=None)
 
 
 class ConceptsActivitiesMaps(ConceptsActivitiesMapsBaseSchema):
@@ -2172,9 +2144,9 @@ class QgenDrafts(QgenDraftsBaseSchema):
 
     # Foreign Keys
     activity: Activities | None = Field(default=None)
-    qgen_draft_instructions_drafts_maps: (
-        list[QgenDraftInstructionsDraftsMaps] | None
-    ) = Field(default=None)
+    qgen_draft_instructions_drafts_maps: list[QgenDraftInstructionsDraftsMaps] | None = Field(
+        default=None
+    )
     qgen_draft_sections: list[QgenDraftSections] | None = Field(default=None)
 
 
@@ -2188,9 +2160,7 @@ class QgenGenerationPanes(QgenGenerationPanesBaseSchema):
     activity: Activities | None = Field(default=None)
     school_class: SchoolClasses | None = Field(default=None)
     subject: Subjects | None = Field(default=None)
-    generation_pane_concepts_maps: list[GenerationPaneConceptsMaps] | None = Field(
-        default=None
-    )
+    generation_pane_concepts_maps: list[GenerationPaneConceptsMaps] | None = Field(default=None)
 
 
 class SchoolClasses(SchoolClassesBaseSchema):

@@ -3,18 +3,17 @@ Routes for the extract_questions endpoint.
 """
 
 import logging
-from typing import Optional
 
 import supabase
-from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from api.v1.auth import get_supabase_client, require_supabase_user
 from api.v1.qgen.credits import check_user_has_credits, deduct_user_credits
 from api.v1.qgen.extract_questions.service import (
-    ExtractQuestionsService,
     ExtractionProcessingError,
     ExtractionValidationError,
+    ExtractQuestionsService,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,16 +26,16 @@ async def extract_questions(
     file: UploadFile = File(..., description="Image or PDF file containing questions"),
     activity_id: str = Form(..., description="UUID of the activity"),
     qgen_draft_id: str = Form(..., description="UUID of the draft to add section to"),
-    prompt: Optional[str] = Form(None, description="Optional custom instructions for extraction"),
-    section_name: Optional[str] = Form(None, description="Optional name for the new section"),
+    prompt: str | None = Form(None, description="Optional custom instructions for extraction"),
+    section_name: str | None = Form(None, description="Optional name for the new section"),
     supabase_client: supabase.Client = Depends(get_supabase_client),
     user: dict = Depends(require_supabase_user),
 ):
     """
     API endpoint to extract questions from an uploaded file (image/PDF).
-    
+
     Creates a new section in the draft and inserts extracted questions into it.
-    
+
     Returns:
         JSON with section_id, section_name, questions_extracted count, and question IDs
     """
@@ -45,8 +44,7 @@ async def extract_questions(
     # Check credits
     if not check_user_has_credits(user_id):
         return JSONResponse(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            content={"error": "Insufficient credits"}
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"}
         )
 
     logger.info(
@@ -75,12 +73,7 @@ async def extract_questions(
             raise HTTPException(status_code=403, detail="Access denied to this activity")
 
         # Validate that draft exists
-        draft = (
-            supabase_client.table("qgen_drafts")
-            .select("id")
-            .eq("id", qgen_draft_id)
-            .execute()
-        )
+        draft = supabase_client.table("qgen_drafts").select("id").eq("id", qgen_draft_id).execute()
 
         if not draft.data:
             raise HTTPException(status_code=404, detail="Draft not found")
@@ -110,22 +103,21 @@ async def extract_questions(
             },
         )
 
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=result
-        )
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
     except ExtractionValidationError as e:
         logger.warning(f"Validation error in extract_questions: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    except ExtractionProcessingError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    except ExtractionProcessingError:
         logger.exception("Error extracting questions")
-        raise HTTPException(status_code=500, detail="Failed to extract questions from file")
-    
+        raise HTTPException(
+            status_code=500, detail="Failed to extract questions from file"
+        ) from None
+
     except HTTPException:
         raise
-    
-    except Exception as e:
+
+    except Exception:
         logger.exception("Unexpected error in extract_questions")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail="Internal Server Error") from None
