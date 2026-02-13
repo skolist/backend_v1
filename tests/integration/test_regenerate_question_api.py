@@ -176,12 +176,7 @@ class TestRegenerateQuestionSuccess:
         assert response.status_code == 200
 
         # Verify question was updated in database
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         assert len(updated_question.data) == 1
         question = updated_question.data[0]
@@ -209,12 +204,7 @@ class TestRegenerateQuestionSuccess:
         assert response.status_code == 200
 
         # Verify all MCQ4 fields are present
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         question = updated_question.data[0]
 
@@ -247,10 +237,7 @@ class TestRegenerateQuestionSuccess:
 
         # Verify activity_id unchanged
         updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("activity_id")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("activity_id").eq("id", question_id).execute()
         )
 
         assert updated_question.data[0]["activity_id"] == original_activity_id
@@ -275,10 +262,7 @@ class TestRegenerateQuestionSuccess:
 
         # Get the regenerated question
         updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("explanation")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("explanation").eq("id", question_id).execute()
         )
 
         explanation = updated_question.data[0]["explanation"]
@@ -305,10 +289,7 @@ class TestRegenerateQuestionSuccess:
 
         # Get the regenerated question
         updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("question_text")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("question_text").eq("id", question_id).execute()
         )
 
         question_text = updated_question.data[0]["question_text"].lower()
@@ -343,12 +324,9 @@ class TestRegenerateQuestionEdgeCases:
             "activity_id": test_activity["id"],
             "question_text": ("What is Newton's first law of motion? Explain in simple terms."),
             "question_type": "short_answer",
-            "answer_text": (
-                "An object in motion will stay in motion " "unless acted upon by an external force."
-            ),
+            "answer_text": ("An object in motion will stay in motion unless acted upon by an external force."),
             "explanation": (
-                "This is the law of inertia. The state of motion of an object "
-                "changes only when a force is applied."
+                "This is the law of inertia. The state of motion of an object " "changes only when a force is applied."
             ),
             "hardness_level": "easy",
             "marks": 3,
@@ -402,10 +380,7 @@ class TestRegenerateQuestionEdgeCases:
 
         # Get the first regeneration
         first_regeneration = (
-            service_supabase_client.table("gen_questions")
-            .select("question_text")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("question_text").eq("id", question_id).execute()
         )
 
         first_text = first_regeneration.data[0]["question_text"]
@@ -419,10 +394,7 @@ class TestRegenerateQuestionEdgeCases:
 
         # Get the second regeneration
         second_regeneration = (
-            service_supabase_client.table("gen_questions")
-            .select("question_text")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("question_text").eq("id", question_id).execute()
         )
 
         second_text = second_regeneration.data[0]["question_text"]
@@ -451,10 +423,7 @@ class TestRegenerateQuestionEdgeCases:
 
         # Verify correct_mcq_option is valid
         updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("correct_mcq_option")
-            .eq("id", question_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("correct_mcq_option").eq("id", question_id).execute()
         )
 
         correct_option = updated_question.data[0]["correct_mcq_option"]

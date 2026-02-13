@@ -203,12 +203,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         assert response.status_code == 200
 
         # Verify question was updated in database
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         assert len(updated_question.data) == 1
         question = updated_question.data[0]
@@ -237,12 +232,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         assert response.status_code == 200
 
         # Verify question was updated
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         question = updated_question.data[0]
         assert question["question_text"] is not None
@@ -270,12 +260,7 @@ class TestRegenerateQuestionWithPromptSuccess:
         assert response.status_code == 200
 
         # Verify all MCQ4 fields are present
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         question = updated_question.data[0]
 
@@ -308,12 +293,7 @@ class TestRegenerateQuestionWithPromptSuccess:
 
         assert response.status_code == 200
 
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         question = updated_question.data[0]
         assert question["explanation"] is not None
@@ -433,12 +413,9 @@ class TestRegenerateQuestionWithPromptEdgeCases:
             "activity_id": test_activity["id"],
             "question_text": "Explain the concept of inertia in your own words.",
             "question_type": "short_answer",
-            "answer_text": (
-                "Inertia is the tendency of an object to resist " "changes in its state of motion."
-            ),
+            "answer_text": ("Inertia is the tendency of an object to resist changes in its state of motion."),
             "explanation": (
-                "Objects at rest stay at rest, objects in motion stay in motion "
-                "unless acted upon by a force."
+                "Objects at rest stay at rest, objects in motion stay in motion " "unless acted upon by a force."
             ),
             "hardness_level": "easy",
             "marks": 3,
@@ -472,12 +449,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
 
         assert response.status_code == 200
 
-        updated_question = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", question_id)
-            .execute()
-        )
+        updated_question = service_supabase_client.table("gen_questions").select("*").eq("id", question_id).execute()
 
         assert len(updated_question.data) == 1
 

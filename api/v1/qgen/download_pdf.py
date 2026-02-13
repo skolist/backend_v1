@@ -424,9 +424,7 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
         else ""
     }
 
-            {
-        "".join(render_section(s, questions, mode, images_map, show_explanation) for s in sections)
-    }
+            {render_all_sections(sections, questions, mode, images_map, show_explanation)}
         </div>
         {katex_script}
     </body>
@@ -435,32 +433,46 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
     return html
 
 
-def render_section(section, all_questions, mode, images_map=None, show_explanation=True):
-    section_questions = sorted(
-        [q for q in all_questions if q["qgen_draft_section_id"] == section["id"]],
-        key=lambda q: q.get("position_in_draft", 0),
-    )
-    if not section_questions:
-        return ""
+def render_all_sections(sections, all_questions, mode, images_map=None, show_explanation=True):
+    """Render all sections with global question numbering."""
+    html_parts = []
+    global_question_index = 0
 
-    total_marks = sum(q.get("marks", 0) for q in section_questions)
+    for section in sections:
+        section_questions = sorted(
+            [q for q in all_questions if q["qgen_draft_section_id"] == section["id"]],
+            key=lambda q: q.get("position_in_draft", 0),
+        )
+        if not section_questions:
+            continue
 
-    html = f"""
-    <div class="section-container">
-        <div class="section-header">
-            <span class="section-name">{section.get("section_name")}</span>
-            <span class="section-marks">[{total_marks}]</span>
+        total_marks = sum(q.get("marks", 0) for q in section_questions)
+
+        questions_html = []
+        for q in section_questions:
+            global_question_index += 1
+            questions_html.append(
+                render_question(
+                    q,
+                    global_question_index,
+                    mode,
+                    images_map.get(q["id"], []) if images_map else [],
+                    show_explanation,
+                )
+            )
+
+        section_html = f"""
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-name">{section.get("section_name")}</span>
+                <span class="section-marks">[{total_marks}]</span>
+            </div>
+            {"".join(questions_html)}
         </div>
-        {"".join(
-            render_question(
-                q, idx + 1, mode,
-                images_map.get(q["id"], []) if images_map else [],
-                show_explanation
-            ) for idx, q in enumerate(section_questions)
-        )}
-    </div>
-    """
-    return html
+        """
+        html_parts.append(section_html)
+
+    return "".join(html_parts)
 
 
 def render_question(q, display_idx, mode, images=None, show_explanation=True):
@@ -486,10 +498,7 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
             labels = ["a)", "b)", "c)", "d)"]
             for i, opt in enumerate(options):
                 if opt:
-                    options_html += (
-                        f'<div class="option">'
-                        f'<span class="opt-label">{labels[i]}</span> {opt}</div>'
-                    )
+                    options_html += f'<div class="option">' f'<span class="opt-label">{labels[i]}</span> {opt}</div>'
             options_html += "</div>"
         elif q.get("question_type") == "match_the_following":
             cols = q.get("match_the_following_columns") or {}

@@ -273,7 +273,8 @@ async def download_docx(
         right_margin = doc_section.right_margin or Inches(1.0)
         printable_width = page_width - left_margin - right_margin
 
-        # Sections and Questions
+        # Sections and Questions - global indexing for consistent numbering across sections
+        global_question_index = 0
         for section in sections:
             section_questions = sorted(
                 [q for q in questions if q["qgen_draft_section_id"] == section["id"]],
@@ -298,16 +299,17 @@ async def download_docx(
 
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-            for idx, q in enumerate(section_questions):
+            for q in section_questions:
+                global_question_index += 1
                 q_p = doc.add_paragraph()
 
                 # Add right-aligned tab stop
                 q_p.paragraph_format.tab_stops.add_tab_stop(printable_width, WD_TAB_ALIGNMENT.RIGHT)
 
-                q_p.add_run(f"{idx + 1}. ").bold = True
+                q_p.add_run(f"{global_question_index}. ").bold = True
 
                 # Question Text with Math
-                add_text_with_math(q_p, q.get("question_text", ""), f"Q{idx + 1}-Text")
+                add_text_with_math(q_p, q.get("question_text", ""), f"Q{global_question_index}-Text")
 
                 m_run = q_p.add_run(f"\t[{q.get('marks')}]")
                 m_run.italic = True
@@ -342,7 +344,7 @@ async def download_docx(
                             if opt:
                                 cell_p = opt_table.rows[row].cells[col].paragraphs[0]
                                 cell_p.add_run(labels[i]).bold = True
-                                add_text_with_math(cell_p, str(opt), f"Q{idx + 1}-Opt{i + 1}")
+                                add_text_with_math(cell_p, str(opt), f"Q{global_question_index}-Opt{i + 1}")
                     elif q.get("question_type") == "match_the_following":
                         cols = q.get("match_the_following_columns") or {}
                         col_names = list(cols.keys())
@@ -367,25 +369,23 @@ async def download_docx(
                                 # Left Col
                                 l_cell_p = match_table.rows[r_idx + 1].cells[0].paragraphs[0]
                                 l_cell_p.add_run(f"{r_idx + 1}. ").bold = True
-                                add_text_with_math(l_cell_p, str(left_item), f"Q{idx + 1}-L{r_idx}")
+                                add_text_with_math(l_cell_p, str(left_item), f"Q{global_question_index}-L{r_idx}")
 
                                 # Right Col
                                 r_cell_p = match_table.rows[r_idx + 1].cells[1].paragraphs[0]
                                 r_cell_p.add_run(f"{chr(65 + r_idx)}. ").bold = True
-                                add_text_with_math(
-                                    r_cell_p, str(right_item), f"Q{idx + 1}-R{r_idx}"
-                                )
+                                add_text_with_math(r_cell_p, str(right_item), f"Q{global_question_index}-R{r_idx}")
 
                 # Answer Key
                 if download_req.mode == "answer":
                     ans_p = doc.add_paragraph()
                     ans_p.add_run("Ans: ").bold = True
-                    add_text_with_math(ans_p, str(q.get("answer_text") or "N/A"), f"Q{idx + 1}-Ans")
+                    add_text_with_math(ans_p, str(q.get("answer_text") or "N/A"), f"Q{global_question_index}-Ans")
 
                     if show_explanation and q.get("explanation"):
                         exp_p = doc.add_paragraph()
                         exp_p.add_run("Explanation: ").bold = True
-                        add_text_with_math(exp_p, str(q["explanation"]), f"Q{idx + 1}-Expl")
+                        add_text_with_math(exp_p, str(q["explanation"]), f"Q{global_question_index}-Expl")
 
                 # Page Break
                 if q.get("is_page_break_below"):

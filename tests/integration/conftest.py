@@ -167,17 +167,13 @@ class MockGeminiModels:
             if "short_answer" in contents_str:
 
                 class QuestionWrapper:
-                    question = create_mock_short_answer(
-                        "Describe the principle of conservation of momentum."
-                    )
+                    question = create_mock_short_answer("Describe the principle of conservation of momentum.")
 
                 return MockParsedResponse(QuestionWrapper())
             else:
 
                 class QuestionWrapper:
-                    question = create_mock_mcq4(
-                        "Calculate the kinetic energy of a 5kg object moving at 10 m/s."
-                    )
+                    question = create_mock_mcq4("Calculate the kinetic energy of a 5kg object moving at 10 m/s.")
 
                 return MockParsedResponse(QuestionWrapper())
 
@@ -191,9 +187,7 @@ class MockGeminiModels:
                         message="Consider adding more variety in question difficulty levels.",
                         priority=7,
                     ),
-                    FeedbackItem(
-                        message="Some questions could benefit from clearer wording.", priority=5
-                    ),
+                    FeedbackItem(message="Some questions could benefit from clearer wording.", priority=5),
                 ]
             )
             return MockParsedResponse(feedback_list)
@@ -495,9 +489,7 @@ def test_topic_id(service_supabase_client: Client) -> Generator[str, None, None]
             board_id = board_resp.data[0]["id"]
         else:
             board_id = str(uuid.uuid4())
-            service_supabase_client.table("boards").insert(
-                {"id": board_id, "name": "Test Board"}
-            ).execute()
+            service_supabase_client.table("boards").insert({"id": board_id, "name": "Test Board"}).execute()
 
         # Check for existing school_class
         class_resp = service_supabase_client.table("school_classes").select("id").limit(1).execute()
@@ -564,19 +556,14 @@ def test_concepts(
         {
             "id": concept_ids[0],
             "name": "Newton's Laws of Motion",
-            "description": (
-                "The three fundamental laws describing "
-                "the relationship between forces and motion."
-            ),
+            "description": ("The three fundamental laws describing the relationship between forces and motion."),
             "topic_id": test_topic_id,
             "page_number": 1,
         },
         {
             "id": concept_ids[1],
             "name": "Kinetic Energy",
-            "description": (
-                "Energy possessed by an object due to its motion. " "Formula: KE = 1/2 * m * v^2."
-            ),
+            "description": ("Energy possessed by an object due to its motion. Formula: KE = 1/2 * m * v^2."),
             "topic_id": test_topic_id,
             "page_number": 2,
         },
@@ -616,12 +603,7 @@ def test_activity(
 
     # Cleanup: First delete related data, then delete activity
     # Delete gen_questions_concepts_maps entries
-    gen_questions = (
-        service_supabase_client.table("gen_questions")
-        .select("id")
-        .eq("activity_id", activity_id)
-        .execute()
-    )
+    gen_questions = service_supabase_client.table("gen_questions").select("id").eq("activity_id", activity_id).execute()
 
     if gen_questions.data:
         question_ids = [q["id"] for q in gen_questions.data]
@@ -630,9 +612,7 @@ def test_activity(
         ).execute()
 
         # Delete gen_questions
-        service_supabase_client.table("gen_questions").delete().eq(
-            "activity_id", activity_id
-        ).execute()
+        service_supabase_client.table("gen_questions").delete().eq("activity_id", activity_id).execute()
 
     # Delete the activity
     service_supabase_client.table("activities").delete().eq("id", activity_id).execute()

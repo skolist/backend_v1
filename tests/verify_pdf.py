@@ -58,9 +58,7 @@ DUMMY_QUESTIONS = [
         "id": "q-2",
         "qgen_draft_section_id": "sec-1",
         "position_in_draft": 2,
-        "question_text": (
-            "Identify the logic gate represented by the symbol below " "and explain its function."
-        ),
+        "question_text": ("Identify the logic gate represented by the symbol below and explain its function."),
         "marks": 5,
         "question_type": "short_answer",
         "answer_text": "The symbol represents an AND gate.",

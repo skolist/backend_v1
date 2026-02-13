@@ -362,10 +362,7 @@ class TestGenerateQuestionsSuccess:
 
         # Verify questions were created in database
         gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("activity_id", activity_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("*").eq("activity_id", activity_id).execute()
         )
 
         assert len(gen_questions.data) >= 1  # At least some questions generated
@@ -412,10 +409,7 @@ class TestGenerateQuestionsSuccess:
 
         # Verify questions were created
         gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("activity_id", activity_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("*").eq("activity_id", activity_id).execute()
         )
 
         question_types = {q["question_type"] for q in gen_questions.data}
@@ -454,10 +448,7 @@ class TestGenerateQuestionsSuccess:
 
         # Get generated question IDs
         gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("id")
-            .eq("activity_id", activity_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("id").eq("activity_id", activity_id).execute()
         )
 
         if gen_questions.data:
@@ -589,10 +580,7 @@ class TestGenerateQuestionsEdgeCases:
 
         # Verify all questions are generated
         gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("activity_id", activity_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("*").eq("activity_id", activity_id).execute()
         )
 
         # Should have generated some questions
@@ -670,10 +658,7 @@ class TestGenerateQuestionsWithInstructions:
 
         # Verify questions were created in database
         gen_questions = (
-            service_supabase_client.table("gen_questions")
-            .select("*")
-            .eq("activity_id", activity_id)
-            .execute()
+            service_supabase_client.table("gen_questions").select("*").eq("activity_id", activity_id).execute()
         )
 
         assert len(gen_questions.data) >= 1
@@ -783,9 +768,7 @@ class TestGenerateQuestionsWithInstructions:
                     "question_types": [{"type": "mcq4", "count": 1}],
                     "difficulty_distribution": {"easy": 50, "medium": 30, "hard": 20},
                 },
-                "instructions": (
-                    "Use LaTeX format: $E = mc^2$, " "include formulas like \\frac{1}{2}mv^2"
-                ),
+                "instructions": ("Use LaTeX format: $E = mc^2$, include formulas like \\frac{1}{2}mv^2"),
             },
         )
 

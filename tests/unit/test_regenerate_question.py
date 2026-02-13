@@ -54,12 +54,9 @@ def mock_short_answer_question() -> dict:
         "id": "550e8400-e29b-41d4-a716-446655440002",
         "question_text": ("What is Newton's first law of motion? Explain in simple terms."),
         "question_type": "short_answer",
-        "answer_text": (
-            "An object in motion will stay in motion " "unless acted upon by an external force."
-        ),
+        "answer_text": ("An object in motion will stay in motion unless acted upon by an external force."),
         "explanation": (
-            "This is the law of inertia. The state of motion of an object "
-            "changes only when a force is applied."
+            "This is the law of inertia. The state of motion of an object " "changes only when a force is applied."
         ),
         "hardness_level": "easy",
         "marks": 3,
@@ -300,10 +297,7 @@ class TestProcessQuestionAndValidate:
         # The regenerated question should still be about kinetic energy
         question_text = result.question_text.lower()
         # At least one of these concepts should be present
-        assert any(
-            concept in question_text
-            for concept in ["kinetic", "energy", "velocity", "motion", "mass"]
-        )
+        assert any(concept in question_text for concept in ["kinetic", "energy", "velocity", "motion", "mass"])
 
     @pytest.mark.slow
     @pytest.mark.asyncio
