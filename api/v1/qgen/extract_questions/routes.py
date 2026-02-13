@@ -43,9 +43,7 @@ async def extract_questions(
 
     # Check credits
     if not check_user_has_credits(user_id):
-        return JSONResponse(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"}
-        )
+        return JSONResponse(status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"})
 
     logger.info(
         "Received extract_questions request",
@@ -59,12 +57,7 @@ async def extract_questions(
 
     try:
         # Validate that activity exists and belongs to user
-        activity = (
-            supabase_client.table("activities")
-            .select("id, user_id")
-            .eq("id", activity_id)
-            .execute()
-        )
+        activity = supabase_client.table("activities").select("id, user_id").eq("id", activity_id).execute()
 
         if not activity.data:
             raise HTTPException(status_code=404, detail="Activity not found")
@@ -111,9 +104,7 @@ async def extract_questions(
 
     except ExtractionProcessingError:
         logger.exception("Error extracting questions")
-        raise HTTPException(
-            status_code=500, detail="Failed to extract questions from file"
-        ) from None
+        raise HTTPException(status_code=500, detail="Failed to extract questions from file") from None
 
     except HTTPException:
         raise

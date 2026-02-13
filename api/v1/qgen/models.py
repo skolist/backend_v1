@@ -29,9 +29,7 @@ class MCQ4(BaseModel):
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
     answer_text: str | None = Field(default=None, description="Answer text if applicable")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class MCQ4List(BaseModel):
@@ -56,9 +54,7 @@ class MSQ4(BaseModel):
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
     answer_text: str | None = Field(default=None, description="Answer text if applicable")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class MSQ4List(BaseModel):
@@ -75,9 +71,7 @@ class FillInTheBlank(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class FillInTheBlankList(BaseModel):
@@ -94,9 +88,7 @@ class TrueFalse(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class TrueFalseList(BaseModel):
@@ -113,9 +105,7 @@ class ShortAnswer(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class ShortAnswerList(BaseModel):
@@ -132,9 +122,7 @@ class LongAnswer(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class LongAnswerList(BaseModel):
@@ -154,9 +142,7 @@ class MatchTheFollowing(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relavant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relavant to the question if needed")
 
 
 class MatchTheFollowingList(BaseModel):
@@ -166,9 +152,7 @@ class MatchTheFollowingList(BaseModel):
 
 
 # Type alias for any question type
-AllQuestions = (
-    MCQ4 | MSQ4 | FillInTheBlank | TrueFalse | ShortAnswer | LongAnswer | MatchTheFollowing
-)
+AllQuestions = MCQ4 | MSQ4 | FillInTheBlank | TrueFalse | ShortAnswer | LongAnswer | MatchTheFollowing
 
 
 # Mapping from question type key to GenAI schema (list wrapper)
@@ -215,9 +199,7 @@ class FeedbackItem(BaseModel):
 class FeedbackList(BaseModel):
     """List of feedback items."""
 
-    feedbacks: list[FeedbackItem] = Field(
-        ..., description="List of feedback items with message and priority"
-    )
+    feedbacks: list[FeedbackItem] = Field(..., description="List of feedback items with message and priority")
 
 
 class AutoCorrectedQuestion(BaseModel):
@@ -240,22 +222,12 @@ class ExtractedQuestion(BaseModel):
     option3: str | None = Field(default=None, description="Third option (for MCQ/MSQ)")
     option4: str | None = Field(default=None, description="Fourth option (for MCQ/MSQ)")
     # MCQ4 answer
-    correct_mcq_option: int | None = Field(
-        default=None, description="Correct option (1-4) for MCQ4"
-    )
+    correct_mcq_option: int | None = Field(default=None, description="Correct option (1-4) for MCQ4")
     # MSQ4 answers
-    msq_option1_answer: bool | None = Field(
-        default=None, description="Is option 1 correct (for MSQ4)"
-    )
-    msq_option2_answer: bool | None = Field(
-        default=None, description="Is option 2 correct (for MSQ4)"
-    )
-    msq_option3_answer: bool | None = Field(
-        default=None, description="Is option 3 correct (for MSQ4)"
-    )
-    msq_option4_answer: bool | None = Field(
-        default=None, description="Is option 4 correct (for MSQ4)"
-    )
+    msq_option1_answer: bool | None = Field(default=None, description="Is option 1 correct (for MSQ4)")
+    msq_option2_answer: bool | None = Field(default=None, description="Is option 2 correct (for MSQ4)")
+    msq_option3_answer: bool | None = Field(default=None, description="Is option 3 correct (for MSQ4)")
+    msq_option4_answer: bool | None = Field(default=None, description="Is option 4 correct (for MSQ4)")
     # Match the following fields
     columns: list[Column] = Field(default=None, description="List of columns for matching")
     # Common fields
@@ -266,14 +238,10 @@ class ExtractedQuestion(BaseModel):
     explanation: str | None = Field(default=None, description="Explanation for the answer")
     hardness_level: str | None = Field(default=None, description="Difficulty: easy, medium, hard")
     marks: int | None = Field(default=None, description="Marks for this question")
-    svgs: list[SVG] | None = Field(
-        default=None, description="List of SVGs relevant to the question if needed"
-    )
+    svgs: list[SVG] | None = Field(default=None, description="List of SVGs relevant to the question if needed")
 
 
 class ExtractedQuestionsList(BaseModel):
     """List of extracted questions of various types."""
 
-    questions: list[ExtractedQuestion] = Field(
-        description="List of extracted questions from the file"
-    )
+    questions: list[ExtractedQuestion] = Field(description="List of extracted questions from the file")

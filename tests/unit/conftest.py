@@ -127,17 +127,13 @@ class MockGeminiModels:
             if "short_answer" in contents_str:
 
                 class QuestionWrapper:
-                    question = create_mock_short_answer(
-                        "Describe the principle of conservation of momentum."
-                    )
+                    question = create_mock_short_answer("Describe the principle of conservation of momentum.")
 
                 return MockParsedResponse(QuestionWrapper())
             else:
 
                 class QuestionWrapper:
-                    question = create_mock_mcq4(
-                        "Calculate the kinetic energy of a 5kg object moving at 10 m/s."
-                    )
+                    question = create_mock_mcq4("Calculate the kinetic energy of a 5kg object moving at 10 m/s.")
 
                 return MockParsedResponse(QuestionWrapper())
 
@@ -151,9 +147,7 @@ class MockGeminiModels:
                         message="Consider adding more variety in question difficulty levels.",
                         priority=7,
                     ),
-                    FeedbackItem(
-                        message="Some questions could benefit from clearer wording.", priority=5
-                    ),
+                    FeedbackItem(message="Some questions could benefit from clearer wording.", priority=5),
                 ]
             )
             return MockParsedResponse(feedback_list)

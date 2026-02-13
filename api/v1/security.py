@@ -47,9 +47,7 @@ def check_phone_number(
 
     try:
         # We select only the phone_num to verify existence
-        response = (
-            supabase.table("users").select("phone_num").eq("phone_num", request.phone).execute()
-        )
+        response = supabase.table("users").select("phone_num").eq("phone_num", request.phone).execute()
 
         exists = len(response.data) > 0 if response.data else False
 

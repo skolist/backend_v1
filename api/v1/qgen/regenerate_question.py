@@ -256,9 +256,7 @@ async def try_retry_and_update(
                 },
             )
 
-            regenerated_question = await process_question_and_validate(
-                gemini_client, gen_question_data, retry_idx
-            )
+            regenerated_question = await process_question_and_validate(gemini_client, gen_question_data, retry_idx)
 
             logger.debug(
                 "Regenerate succeeded, updating database",
@@ -287,26 +285,18 @@ async def try_retry_and_update(
                 else:
                     update_data["match_the_following_columns"] = cols
 
-            supabase_client.table("gen_questions").update(update_data).eq(
-                "id", gen_question_id
-            ).execute()
+            supabase_client.table("gen_questions").update(update_data).eq("id", gen_question_id).execute()
 
             # Insert SVGs into gen_images table if present
             if svg_list:
-                logger.debug(
-                    f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found"
-                )
+                logger.debug(f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found")
 
                 # First, delete existing SVGs for this question (to replace with new ones)
-                supabase_client.table("gen_images").delete().eq(
-                    "gen_question_id", gen_question_id
-                ).execute()
+                supabase_client.table("gen_images").delete().eq("gen_question_id", gen_question_id).execute()
 
                 for position, svg_item in enumerate(svg_list, start=1):
                     try:
-                        svg_string = (
-                            svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
-                        )
+                        svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
                         if svg_string:
                             gen_image = GenImagesInsert(
                                 gen_question_id=gen_question_id,
@@ -317,9 +307,7 @@ async def try_retry_and_update(
                                 gen_image.model_dump(mode="json", exclude_none=True)
                             ).execute()
                     except Exception as svg_error:
-                        logger.warning(
-                            f"Failed to insert SVG for question {gen_question_id}: {svg_error}"
-                        )
+                        logger.warning(f"Failed to insert SVG for question {gen_question_id}: {svg_error}")
 
             logger.debug(
                 "Database update completed successfully",
@@ -352,9 +340,7 @@ async def try_retry_and_update(
                 )
 
     # All retries exhausted
-    raise QuestionProcessingError(
-        f"Regenerate failed after {max_retries} retries"
-    ) from last_exception
+    raise QuestionProcessingError(f"Regenerate failed after {max_retries} retries") from last_exception
 
 
 # ============================================================================
@@ -384,9 +370,7 @@ async def regenerate_question(
 
     # Check credits
     if not check_user_has_credits(user_id):
-        return Response(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits"
-        )
+        return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
 
     logger.info(
         "Received regenerate request",
@@ -395,9 +379,7 @@ async def regenerate_question(
 
     # Fetch the question from the database
     try:
-        gen_question = (
-            supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).execute()
-        )
+        gen_question = supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).execute()
 
         if not gen_question.data:
             raise HTTPException(status_code=404, detail="Gen Question not found")

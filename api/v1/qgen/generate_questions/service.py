@@ -235,9 +235,7 @@ async def try_retry_batch(
             if attempt >= max_retries - 1:
                 logger.error(f"All retry attempts exhausted for batch {batch_idx}: {e}")
 
-    raise BatchGenerationError(
-        f"Batch generation failed after {max_retries} retries"
-    ) from last_exception
+    raise BatchGenerationError(f"Batch generation failed after {max_retries} retries") from last_exception
 
 
 async def insert_batch_to_supabase(
@@ -316,9 +314,7 @@ async def insert_batch_to_supabase(
                 for position, svg_item in enumerate(svg_list, start=1):
                     try:
                         # svg_item can be a dict with 'svg' key or an object with svg attribute
-                        svg_string = (
-                            svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
-                        )
+                        svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
                         if svg_string:
                             gen_image = GenImagesInsert(
                                 gen_question_id=question_id,
@@ -329,9 +325,7 @@ async def insert_batch_to_supabase(
                                 gen_image.model_dump(mode="json", exclude_none=True)
                             ).execute()
                     except Exception as svg_error:
-                        logger.warning(
-                            f"Failed to insert SVG for question {question_id}: {svg_error}"
-                        )
+                        logger.warning(f"Failed to insert SVG for question {question_id}: {svg_error}")
 
             for concept_id in concept_ids:
                 try:
@@ -342,9 +336,7 @@ async def insert_batch_to_supabase(
                         "gen_question_id": str(question_id),
                         "concept_id": str(concept_id),
                     }
-                    supabase_client.table("gen_questions_concepts_maps").insert(
-                        concept_map_payload
-                    ).execute()
+                    supabase_client.table("gen_questions_concepts_maps").insert(concept_map_payload).execute()
                 except Exception as mapping_error:
                     if "duplicate key value violates unique constraint" not in str(mapping_error):
                         logger.warning(f"Failed to create mapping: {mapping_error}")

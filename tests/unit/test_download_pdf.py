@@ -98,9 +98,7 @@ def test_download_pdf_working(test_app):
     """
     client, app, mock_browser = test_app
 
-    response = client.post(
-        "/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"}
-    )
+    response = client.post("/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"})
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
@@ -118,9 +116,7 @@ def test_browser_instance_efficiency(test_app):
 
     # Hit the endpoint 3 times
     for _ in range(3):
-        response = client.post(
-            "/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"}
-        )
+        response = client.post("/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"})
         assert response.status_code == 200
 
     # Ensure context creation happened 3 times
@@ -138,9 +134,7 @@ def test_error_if_service_missing_in_app_state(test_app):
     # Intentionally break the state
     app.state.browser_service = None
 
-    response = client.post(
-        "/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"}
-    )
+    response = client.post("/api/v1/qgen/download_pdf", json={"draft_id": "test-draft", "mode": "paper"})
 
     assert response.status_code == 503
     assert "unavailable" in response.json()["detail"].lower()

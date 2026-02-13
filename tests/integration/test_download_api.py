@@ -33,10 +33,7 @@ def test_draft_with_section(
 
     # Get the auto-created draft for this activity (created by trigger on activity insert)
     draft_resp = (
-        service_supabase_client.table("qgen_drafts")
-        .select("id")
-        .eq("activity_id", test_activity["id"])
-        .execute()
+        service_supabase_client.table("qgen_drafts").select("id").eq("activity_id", test_activity["id"]).execute()
     )
 
     if not draft_resp.data:

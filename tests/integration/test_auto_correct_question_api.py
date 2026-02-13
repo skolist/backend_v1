@@ -344,9 +344,7 @@ class TestAutoCorrectQuestionEdgeCases:
             "question_text": ("What is newtons first law of motion? Explain in simple terms using proper grammar"),
             "question_type": "short_answer",
             "answer_text": ("An object in motion will stay in motion unless acted upon by external force"),
-            "explanation": (
-                "This is the law of inertia. State of motion of object " "changes only when force is applied"
-            ),
+            "explanation": ("This is the law of inertia. State of motion of object changes only when force is applied"),
             "hardness_level": "easy",
             "marks": 3,
         }

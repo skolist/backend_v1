@@ -101,9 +101,7 @@ class TestRegenerateWithPromptService:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_regenerate_question_flow(
-        self, mock_mcq4_question: dict, mock_browser, mock_supabase
-    ):
+    async def test_regenerate_question_flow(self, mock_mcq4_question: dict, mock_browser, mock_supabase):
         # Mock generic Gemini client
         mock_gemini = MagicMock()
         mock_gemini.aio.models.generate_content = AsyncMock()
@@ -119,9 +117,7 @@ class TestRegenerateWithPromptService:
         # Patch screenshot utils to avoid actual browser/file ops if needed,
         # but since we pass mock_browser, generate_screenshot will use it.
         with (
-            patch(
-                "api.v1.qgen.regenerate_with_prompt.service.save_image_for_debug", new=AsyncMock()
-            ) as mock_save,
+            patch("api.v1.qgen.regenerate_with_prompt.service.save_image_for_debug", new=AsyncMock()) as mock_save,
             patch(
                 "api.v1.qgen.regenerate_with_prompt.service.RegenerateWithPromptService.process_and_validate"
             ) as mock_process,

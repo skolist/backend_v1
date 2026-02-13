@@ -16,9 +16,7 @@ from ..models import (
 
 
 class MCQ4WithConcepts(MCQ4):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class MCQ4WithConceptsList(BaseModel):
@@ -26,9 +24,7 @@ class MCQ4WithConceptsList(BaseModel):
 
 
 class MSQ4WithConcepts(MSQ4):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class MSQ4WithConceptsList(BaseModel):
@@ -36,9 +32,7 @@ class MSQ4WithConceptsList(BaseModel):
 
 
 class FillInTheBlankWithConcepts(FillInTheBlank):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class FillInTheBlankWithConceptsList(BaseModel):
@@ -46,9 +40,7 @@ class FillInTheBlankWithConceptsList(BaseModel):
 
 
 class TrueFalseWithConcepts(TrueFalse):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class TrueFalseWithConceptsList(BaseModel):
@@ -56,9 +48,7 @@ class TrueFalseWithConceptsList(BaseModel):
 
 
 class ShortAnswerWithConcepts(ShortAnswer):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class ShortAnswerWithConceptsList(BaseModel):
@@ -66,9 +56,7 @@ class ShortAnswerWithConceptsList(BaseModel):
 
 
 class LongAnswerWithConcepts(LongAnswer):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class LongAnswerWithConceptsList(BaseModel):
@@ -76,9 +64,7 @@ class LongAnswerWithConceptsList(BaseModel):
 
 
 class MatchTheFollowingWithConcepts(MatchTheFollowing):
-    concepts: list[str] = Field(
-        ..., description="List of concept names relevant to this specific question"
-    )
+    concepts: list[str] = Field(..., description="List of concept names relevant to this specific question")
 
 
 class MatchTheFollowingWithConceptsList(BaseModel):

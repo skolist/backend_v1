@@ -89,9 +89,7 @@ def test_download_docx_working(test_app):
         mock_fetch.return_value = mock_paper_data()
 
         with patch("api.v1.qgen.download_docx.math2docx.add_math") as mock_add_math:
-            response = client.post(
-                "/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"}
-            )
+            response = client.post("/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"})
 
             assert response.status_code == 200
             assert (
@@ -132,9 +130,7 @@ def test_download_docx_page_break(test_app):
             # Mock style access to avoid errors
             mock_doc.styles.__getitem__.return_value.font.name = "Test"
 
-            response = client.post(
-                "/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"}
-            )
+            response = client.post("/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"})
 
             assert response.status_code == 200
             # Should be called exactly once because only one question has the flag
@@ -182,9 +178,7 @@ def test_download_docx_rollback_on_math_failure(test_app):
             with patch("api.v1.qgen.download_docx.math2docx.add_math") as mock_add_math:
                 mock_add_math.side_effect = Exception("Simulated Math Failure")
 
-                response = client.post(
-                    "/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"}
-                )
+                response = client.post("/api/v1/qgen/download_docx", json={"draft_id": "test-draft", "mode": "paper"})
 
                 assert response.status_code == 200
 
@@ -199,8 +193,6 @@ def test_download_docx_rollback_on_math_failure(test_app):
                 # So we expect add_run to be called with the latex part.
 
                 # Filter calls to find the one with our latex
-                run_calls = [
-                    args[0][0] for args in mock_paragraph.add_run.call_args_list if args[0]
-                ]
+                run_calls = [args[0][0] for args in mock_paragraph.add_run.call_args_list if args[0]]
                 # The latex part includes the delimiters in the fallback logic: "$\cos\theta$"
                 assert latex_text in run_calls

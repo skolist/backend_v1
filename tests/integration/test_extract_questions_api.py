@@ -165,10 +165,7 @@ class TestExtractQuestionsFunctional:
         """Get the auto-created draft for extraction testing."""
         # Draft is auto-created via trigger when activity is created
         draft_resp = (
-            service_supabase_client.table("qgen_drafts")
-            .select("id")
-            .eq("activity_id", test_activity["id"])
-            .execute()
+            service_supabase_client.table("qgen_drafts").select("id").eq("activity_id", test_activity["id"]).execute()
         )
 
         if not draft_resp.data:
@@ -182,9 +179,7 @@ class TestExtractQuestionsFunctional:
         }
 
         # Cleanup - delete sections (draft is auto-created, deleted via cascade)
-        service_supabase_client.table("qgen_draft_sections").delete().eq(
-            "qgen_draft_id", draft_id
-        ).execute()
+        service_supabase_client.table("qgen_draft_sections").delete().eq("qgen_draft_id", draft_id).execute()
 
     @pytest.mark.slow
     def test_extracts_questions_from_image(

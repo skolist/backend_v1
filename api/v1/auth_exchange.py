@@ -33,10 +33,7 @@ try:
             else:
                 # Treat as file path
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
-                logger.info(
-                    "Initializing Firebase Admin with certificate file: "
-                    f"{settings.FIREBASE_CREDENTIALS}"
-                )
+                logger.info(f"Initializing Firebase Admin with certificate file: {settings.FIREBASE_CREDENTIALS}")
 
             if cred:
                 firebase_admin.initialize_app(cred)
@@ -90,12 +87,7 @@ async def exchange_firebase_token(req: ExchangeRequest):
     for attempt in range(max_retries):
         try:
             # Query the table
-            res = (
-                supabase.table("phonenum_otps")
-                .select("otp")
-                .eq("phone_number", phone_number)
-                .execute()
-            )
+            res = supabase.table("phonenum_otps").select("otp").eq("phone_number", phone_number).execute()
 
             if res.data and len(res.data) > 0:
                 found_otp = res.data[0]["otp"]
@@ -112,9 +104,7 @@ async def exchange_firebase_token(req: ExchangeRequest):
             await asyncio.sleep(retry_delay)
 
     if not found_otp:
-        raise HTTPException(
-            status_code=404, detail="OTP not found temporarily. Please try again or resend."
-        )
+        raise HTTPException(status_code=404, detail="OTP not found temporarily. Please try again or resend.")
 
     # 4. Return the OTP
     return {"otp": found_otp}

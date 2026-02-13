@@ -39,9 +39,7 @@ async def edit_svg(
 
     # Check credits
     if not check_user_has_credits(user_id):
-        return JSONResponse(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"}
-        )
+        return JSONResponse(status_code=status.HTTP_402_PAYMENT_REQUIRED, content={"error": "Insufficient credits"})
 
     logger.info(
         "Received edit SVG request",

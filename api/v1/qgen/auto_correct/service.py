@@ -143,27 +143,18 @@ class AutoCorrectService:
                 # Create new version before updating question
                 create_new_version_on_update(supabase_client, gen_question_id, update_data)
 
-                supabase_client.table("gen_questions").update(update_data).eq(
-                    "id", gen_question_id
-                ).execute()
+                supabase_client.table("gen_questions").update(update_data).eq("id", gen_question_id).execute()
 
                 # Insert SVGs into gen_images table if present
                 if svg_list:
-                    logger.debug(
-                        f"SVGs generated for question {gen_question_id}: "
-                        f"{len(svg_list)} SVG(s) found"
-                    )
+                    logger.debug(f"SVGs generated for question {gen_question_id}: {len(svg_list)} SVG(s) found")
 
                     # First, delete existing SVGs for this question (to replace with new ones)
-                    supabase_client.table("gen_images").delete().eq(
-                        "gen_question_id", gen_question_id
-                    ).execute()
+                    supabase_client.table("gen_images").delete().eq("gen_question_id", gen_question_id).execute()
 
                     for position, svg_item in enumerate(svg_list, start=1):
                         try:
-                            svg_string = (
-                                svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
-                            )
+                            svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
                             if svg_string:
                                 gen_image = GenImagesInsert(
                                     gen_question_id=gen_question_id,
@@ -174,15 +165,11 @@ class AutoCorrectService:
                                     gen_image.model_dump(mode="json", exclude_none=True)
                                 ).execute()
                         except Exception as svg_error:
-                            logger.warning(
-                                f"Failed to insert SVG for question {gen_question_id}: {svg_error}"
-                            )
+                            logger.warning(f"Failed to insert SVG for question {gen_question_id}: {svg_error}")
 
                 return True
             except Exception as e:
                 last_exception = e
                 logger.warning(f"Attempt {attempt + 1} failed: {e}")
 
-        raise QuestionProcessingError(
-            f"Auto-correct failed after {max_retries} retries"
-        ) from last_exception
+        raise QuestionProcessingError(f"Auto-correct failed after {max_retries} retries") from last_exception

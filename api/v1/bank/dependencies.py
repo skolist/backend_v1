@@ -16,9 +16,7 @@ def require_admin(
     Dependency that enforces admin access by checking 'user_type' in public.users table.
     """
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
 
@@ -27,22 +25,16 @@ def require_admin(
 
     try:
         # Query public.users table for user_type
-        response = (
-            supabase_client.table("users").select("user_type").eq("id", user_id).single().execute()
-        )
+        response = supabase_client.table("users").select("user_type").eq("id", user_id).single().execute()
 
         if not response.data:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="User profile not found"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User profile not found")
 
         user_type = response.data.get("user_type")
 
         if user_type != "skolist-admin":
             logger.warning(f"Unauthorized access attempt by user {user_id} with type {user_type}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
         return user
 

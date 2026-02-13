@@ -53,9 +53,7 @@ def mock_browser_service():
     # ...
 
     @pytest.mark.asyncio
-    async def test_correct_question_flow(
-        self, mock_mcq4_question: dict, mock_browser_service, mock_supabase
-    ):
+    async def test_correct_question_flow(self, mock_mcq4_question: dict, mock_browser_service, mock_supabase):
         # Mock generic Gemini client for this specific test to avoid real calls
         mock_gemini = MagicMock()
         mock_gemini.aio.models.generate_content = AsyncMock()
@@ -89,9 +87,7 @@ def mock_browser_service():
 
 class TestGenerateScreenshot:
     @pytest.mark.asyncio
-    async def test_generate_screenshot_calls_service(
-        self, mock_mcq4_question: dict, mock_browser_service
-    ):
+    async def test_generate_screenshot_calls_service(self, mock_mcq4_question: dict, mock_browser_service):
         """
         Test that generate_screenshot calls browser_service.take_screenshot.
         """

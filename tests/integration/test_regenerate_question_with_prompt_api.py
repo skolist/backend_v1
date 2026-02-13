@@ -415,7 +415,7 @@ class TestRegenerateQuestionWithPromptEdgeCases:
             "question_type": "short_answer",
             "answer_text": ("Inertia is the tendency of an object to resist changes in its state of motion."),
             "explanation": (
-                "Objects at rest stay at rest, objects in motion stay in motion " "unless acted upon by a force."
+                "Objects at rest stay at rest, objects in motion stay in motion unless acted upon by a force."
             ),
             "hardness_level": "easy",
             "marks": 3,

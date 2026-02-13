@@ -90,9 +90,7 @@ class BrowserService:
                 self._queue.task_done()
         logger.info("BrowserService worker loop exited.")
 
-    async def _submit(
-        self, func: Callable, context_options: dict[str, Any], *args, **kwargs
-    ) -> Any:
+    async def _submit(self, func: Callable, context_options: dict[str, Any], *args, **kwargs) -> Any:
         """Submit a task to the queue and wait for the result."""
         if not self._running:
             raise RuntimeError("BrowserService is not running")
@@ -132,15 +130,11 @@ class BrowserService:
 
             return await element.screenshot(**(options or {}))
 
-        return await self._submit(
-            _task, context_options, html_content, selector, screenshot_options
-        )
+        return await self._submit(_task, context_options, html_content, selector, screenshot_options)
 
     # We need to handle context options (like viewport, scale factor)
     # Let's enhance _submit to accept context_options
 
-    async def _submit_with_options(
-        self, func: Callable, context_options: dict[str, Any], *args, **kwargs
-    ) -> Any:
+    async def _submit_with_options(self, func: Callable, context_options: dict[str, Any], *args, **kwargs) -> Any:
         # We need a new internal message type or just change the signature
         pass

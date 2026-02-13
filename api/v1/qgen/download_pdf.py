@@ -400,9 +400,7 @@ def generate_paper_html(draft, sections, questions, instructions, logo_url, mode
                 <div class="meta-box">
                     <div class="meta-column" style="text-align: left;">
                         <span>Subject: {draft.get("subject_name") or "..................."}</span>
-                        <span>Class: {
-        draft.get("school_class_name") or "..................."
-    }</span>
+                        <span>Class: {draft.get("school_class_name") or "..................."}</span>
                     </div>
                     <div class="meta-column" style="text-align: right;">
                         <span>Max. Marks: {draft.get("maximum_marks") or "..."}</span>
@@ -498,7 +496,7 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
             labels = ["a)", "b)", "c)", "d)"]
             for i, opt in enumerate(options):
                 if opt:
-                    options_html += f'<div class="option">' f'<span class="opt-label">{labels[i]}</span> {opt}</div>'
+                    options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
             options_html += "</div>"
         elif q.get("question_type") == "match_the_following":
             cols = q.get("match_the_following_columns") or {}
@@ -519,8 +517,7 @@ def render_question(q, display_idx, mode, images=None, show_explanation=True):
 
                     options_html += "<tr>"
                     options_html += (
-                        f'<td><div class="match-item">'
-                        f'<span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
+                        f'<td><div class="match-item"><span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
                     )
                     options_html += (
                         f'<td><div class="match-item">'

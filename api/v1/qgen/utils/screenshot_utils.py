@@ -144,9 +144,7 @@ async def generate_screenshot(question: dict[str, Any], browser_service) -> byte
         options_html = '<div class="options-grid">'
         for i, opt in enumerate(options):
             if opt:
-                options_html += (
-                    f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
-                )
+                options_html += f'<div class="option"><span class="opt-label">{labels[i]}</span> {opt}</div>'
         options_html += "</div>"
     elif question.get("question_type") == "match_the_following":
         cols = question.get("match_the_following_columns") or {}
@@ -168,9 +166,7 @@ async def generate_screenshot(question: dict[str, Any], browser_service) -> byte
 
                 options_html += "<tr>"
                 options_html += (
-                    f'<td><div class="match-item">'
-                    f'<span class="match-prefix">{i + 1}.</span> '
-                    f"{left_item}</div></td>"
+                    f'<td><div class="match-item"><span class="match-prefix">{i + 1}.</span> {left_item}</div></td>'
                 )
                 options_html += (
                     f'<td><div class="match-item">'

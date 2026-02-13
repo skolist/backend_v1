@@ -53,9 +53,7 @@ class ListQuestionsResponse(BaseModel):
 
 
 @router.post("/list", response_model=ListQuestionsResponse)
-async def list_bank_questions(
-    request: ListQuestionsRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def list_bank_questions(request: ListQuestionsRequest, supabase: Client = Depends(get_supabase_client)):
     """
     Fetch paginated list of bank questions with filters.
     """
@@ -114,9 +112,7 @@ async def list_bank_questions(
 
             valid_ids = [row["bank_question_id"] for row in map_res.data]
             if not valid_ids:
-                return ListQuestionsResponse(
-                    data=[], total=0, page=request.page, page_size=request.page_size
-                )
+                return ListQuestionsResponse(data=[], total=0, page=request.page, page_size=request.page_size)
 
             query = query.in_("id", valid_ids)
 
@@ -227,9 +223,7 @@ class CompareResponse(BaseModel):
 
 
 @router.post("/preview/auto-correct", response_model=CompareResponse)
-async def preview_auto_correct(
-    request: PreviewRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def preview_auto_correct(request: PreviewRequest, supabase: Client = Depends(get_supabase_client)):
     """
     Run auto-correct on the question but DO NOT save.
     Returns both original and new version for comparison.
@@ -267,9 +261,7 @@ class RegeneratePreviewRequest(BaseModel):
 
 
 @router.post("/preview/regenerate", response_model=CompareResponse)
-async def preview_regenerate(
-    request: RegeneratePreviewRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def preview_regenerate(request: RegeneratePreviewRequest, supabase: Client = Depends(get_supabase_client)):
     """
     Run regenerate on the question but DO NOT save.
     """
@@ -289,13 +281,9 @@ async def preview_regenerate(
             # The prompt generator might need adjustment if we strictly want "User Prompt" style
             # But usually it uses fields available.
             # Let's assume we update the instruction field for the prompt
-            q_data["question_text"] = (
-                f"{q_data.get('question_text')} \n\nInstruction: {request.prompt}"
-            )
+            q_data["question_text"] = f"{q_data.get('question_text')} \n\nInstruction: {request.prompt}"
 
-        new_q = await process_question_and_validate(
-            gemini_client=gemini_client, gen_question_data=q_data, retry_idx=0
-        )
+        new_q = await process_question_and_validate(gemini_client=gemini_client, gen_question_data=q_data, retry_idx=0)
 
         new_data = new_q.model_dump(exclude_none=True)
         merged_new = {**request.question, **new_data}
@@ -317,9 +305,7 @@ class UpdateBankQuestionRequest(BaseModel):
 
 
 @router.post("/update")
-async def update_bank_question(
-    request: UpdateBankQuestionRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def update_bank_question(request: UpdateBankQuestionRequest, supabase: Client = Depends(get_supabase_client)):
     """
     Persist changes to bank_questions table.
     """
@@ -389,13 +375,9 @@ class QuestionIdRequest(BaseModel):
 
 
 @router.post("/remove_image_needed")
-async def remove_image_needed(
-    request: QuestionIdRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def remove_image_needed(request: QuestionIdRequest, supabase: Client = Depends(get_supabase_client)):
     try:
-        supabase.table("bank_questions").update({"is_image_needed": False}).eq(
-            "id", request.id
-        ).execute()
+        supabase.table("bank_questions").update({"is_image_needed": False}).eq("id", request.id).execute()
         return {"status": "success", "id": request.id}
     except Exception as e:
         logger.error(f"Failed to remove image needed flag: {e}")
@@ -403,13 +385,9 @@ async def remove_image_needed(
 
 
 @router.post("/remove_incomplete")
-async def remove_incomplete(
-    request: QuestionIdRequest, supabase: Client = Depends(get_supabase_client)
-):
+async def remove_incomplete(request: QuestionIdRequest, supabase: Client = Depends(get_supabase_client)):
     try:
-        supabase.table("bank_questions").update({"is_incomplete": False}).eq(
-            "id", request.id
-        ).execute()
+        supabase.table("bank_questions").update({"is_incomplete": False}).eq("id", request.id).execute()
         return {"status": "success", "id": request.id}
     except Exception as e:
         logger.error(f"Failed to remove incomplete flag: {e}")

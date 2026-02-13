@@ -67,9 +67,7 @@ def admin_auth_session(env: dict[str, str], service_supabase_client: Client):
     }
 
     # Cleanup: reset user type to non-admin
-    service_supabase_client.table("users").update({"user_type": "private_user"}).eq(
-        "id", user_id
-    ).execute()
+    service_supabase_client.table("users").update({"user_type": "private_user"}).eq("id", user_id).execute()
 
 
 @pytest.fixture

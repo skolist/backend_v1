@@ -111,15 +111,11 @@ class EditSVGService:
 
                 # Validate it starts with <svg
                 if not new_svg.startswith("<svg") and not new_svg.startswith("<?xml"):
-                    logger.warning(
-                        f"Attempt {attempt + 1}: Response doesn't look like SVG: {new_svg[:100]}"
-                    )
+                    logger.warning(f"Attempt {attempt + 1}: Response doesn't look like SVG: {new_svg[:100]}")
                     continue
 
                 # 3. Update in Supabase
-                supabase_client.table("gen_images").update({"svg_string": new_svg}).eq(
-                    "id", gen_image_id
-                ).execute()
+                supabase_client.table("gen_images").update({"svg_string": new_svg}).eq("id", gen_image_id).execute()
 
                 logger.info(f"Successfully updated SVG for image {gen_image_id}")
 

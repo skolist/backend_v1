@@ -30,9 +30,7 @@ async def regenerate_question(
 
     # Check credits
     if not check_user_has_credits(user_id):
-        return Response(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits"
-        )
+        return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
 
     logger.info(
         "Received regenerate request",
@@ -41,9 +39,7 @@ async def regenerate_question(
 
     try:
         # Fetch Question
-        gen_question = (
-            supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).execute()
-        )
+        gen_question = supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).execute()
 
         if not gen_question.data:
             raise HTTPException(status_code=404, detail="Gen Question not found")
@@ -65,9 +61,7 @@ async def regenerate_question(
                 "Received svgs for the question for regeneration",
                 extra={"gen_images": gen_images.data, "user_id": user_id},
             )
-            gen_question_data["svgs"] = [
-                {"svg": img["svg_string"]} for img in gen_images.data if img.get("svg_string")
-            ]
+            gen_question_data["svgs"] = [{"svg": img["svg_string"]} for img in gen_images.data if img.get("svg_string")]
         else:
             logger.debug(
                 "No SVGS were found for this question for regeneration",

@@ -26,9 +26,7 @@ def extract_bank_question_to_gen_payload(
     # Base mapping
     payload = {
         "question_text": bank_question.get("question_text"),
-        "answer_text": bank_question.get(
-            "answer_text", ""
-        ),  # Ensure answer_text is at least empty string
+        "answer_text": bank_question.get("answer_text", ""),  # Ensure answer_text is at least empty string
         "explanation": bank_question.get("explanation"),
         "marks": bank_question.get("marks"),
         "hardness_level": bank_question.get("hardness_level"),
@@ -52,16 +50,10 @@ def extract_bank_question_to_gen_payload(
         "msq_option3_answer": bank_question.get("msq_option3_answer"),
         "msq_option4_answer": bank_question.get("msq_option4_answer"),
         # Flags (The new columns)
-        "is_solved_example": (
-            True if request_type == QuestionRequestType.SOLVED_EXAMPLE else False
-        ),
-        "is_exercise_question": (
-            True if request_type == QuestionRequestType.EXERCISE_QUESTION else False
-        ),
+        "is_solved_example": (True if request_type == QuestionRequestType.SOLVED_EXAMPLE else False),
+        "is_exercise_question": (True if request_type == QuestionRequestType.EXERCISE_QUESTION else False),
         # Other fields
-        "match_the_following_columns": bank_question.get(
-            "match_columns"
-        ),  # Note column mismatch handling
+        "match_the_following_columns": bank_question.get("match_columns"),  # Note column mismatch handling
         # svgs might handle differently if they are not in gen_questions
         # directly but in gen_images
         # We will handle SVGs separately if needed, but bank_questions
@@ -106,11 +98,7 @@ def fetch_questions_from_bank(
     """
 
     # correct flag column
-    flag_filter = (
-        "is_solved_example"
-        if request_type == QuestionRequestType.SOLVED_EXAMPLE
-        else "is_from_exercise"
-    )
+    flag_filter = "is_solved_example" if request_type == QuestionRequestType.SOLVED_EXAMPLE else "is_from_exercise"
 
     # Get concept IDs
     concept_ids = [concepts_name_to_id.get(c) for c in concept_names if concepts_name_to_id.get(c)]

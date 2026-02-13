@@ -92,9 +92,7 @@ async def fetch_paper_data(draft_id: str, supabase_client: supabase.Client):
         logo_url = None
         if draft.get("logo_url"):
             try:
-                logo_res = supabase_client.storage.from_("draft_logo_bucket").create_signed_url(
-                    draft["logo_url"], 3600
-                )
+                logo_res = supabase_client.storage.from_("draft_logo_bucket").create_signed_url(draft["logo_url"], 3600)
                 logo_url = logo_res.get("signedUrl")
             except Exception as e:
                 logger.warning(f"Failed to get signed logo URL: {e}")

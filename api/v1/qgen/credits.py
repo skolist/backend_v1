@@ -22,9 +22,7 @@ def check_user_has_credits(user_id: uuid.UUID) -> bool:
     """
     try:
         supabase = get_supabase_client()
-        response = (
-            supabase.table("users").select("credits").eq("id", str(user_id)).single().execute()
-        )
+        response = supabase.table("users").select("credits").eq("id", str(user_id)).single().execute()
 
         if not response.data:
             logger.warning(f"User {user_id} not found when checking credits.")
@@ -55,9 +53,7 @@ def deduct_user_credits(user_id: uuid.UUID, credits_used: int) -> None:
         supabase = get_supabase_client()
 
         # 1. Fetch current credits
-        response = (
-            supabase.table("users").select("credits").eq("id", str(user_id)).single().execute()
-        )
+        response = supabase.table("users").select("credits").eq("id", str(user_id)).single().execute()
 
         if not response.data:
             logger.error(f"User {user_id} not found when deducting credits.")
@@ -71,10 +67,7 @@ def deduct_user_credits(user_id: uuid.UUID, credits_used: int) -> None:
         # 3. Update credits
         supabase.table("users").update({"credits": new_credits}).eq("id", str(user_id)).execute()
 
-        logger.info(
-            f"Deducted {credits_used} credits from user {user_id}. "
-            f"Old: {current_credits}, New: {new_credits}"
-        )
+        logger.info(f"Deducted {credits_used} credits from user {user_id}. Old: {current_credits}, New: {new_credits}")
 
     except Exception as e:
         logger.error(f"Error deducting credits for user {user_id}: {e}")

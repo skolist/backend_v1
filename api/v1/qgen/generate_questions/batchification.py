@@ -151,9 +151,7 @@ def _apply_custom_instruction_fraction(
             "No batches will receive custom instructions",
             extra={"reason": "k <= 0"},
         )
-        return [
-            Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, None) for b in batches
-        ]
+        return [Batch(b.question_type, b.difficulty, b.n_questions, b.concepts, None) for b in batches]
     if k >= n:
         logger.debug(
             "All batches will receive custom instructions",

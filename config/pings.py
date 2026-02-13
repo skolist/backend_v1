@@ -62,9 +62,7 @@ def check_gemini_api_key(gemini_key):
     try:
         client = genai.Client(api_key=gemini_key)
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash", contents="Are you working?"
-        )
+        response = client.models.generate_content(model="gemini-2.5-flash", contents="Are you working?")
         logger.info(
             "Gemini API key check passed",
             extra={

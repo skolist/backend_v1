@@ -155,9 +155,7 @@ class ExtractQuestionsService:
                 logger.warning(f"Extraction attempt {attempt + 1} failed: {e}")
 
         if extracted_result is None:
-            raise ExtractionProcessingError(
-                f"Extraction failed after {max_retries} retries"
-            ) from last_exception
+            raise ExtractionProcessingError(f"Extraction failed after {max_retries} retries") from last_exception
 
         questions = extracted_result.questions
 
@@ -291,11 +289,7 @@ class ExtractQuestionsService:
                     if svg_list:
                         for svg_position, svg_item in enumerate(svg_list, start=1):
                             try:
-                                svg_string = (
-                                    svg_item.get("svg")
-                                    if isinstance(svg_item, dict)
-                                    else svg_item.svg
-                                )
+                                svg_string = svg_item.get("svg") if isinstance(svg_item, dict) else svg_item.svg
                                 if svg_string:
                                     gen_image = GenImagesInsert(
                                         gen_question_id=question_id,
@@ -306,18 +300,13 @@ class ExtractQuestionsService:
                                         gen_image.model_dump(mode="json", exclude_none=True)
                                     ).execute()
                             except Exception as svg_error:
-                                logger.warning(
-                                    f"Failed to insert SVG for question {question_id}: {svg_error}"
-                                )
+                                logger.warning(f"Failed to insert SVG for question {question_id}: {svg_error}")
 
             except Exception as q_error:
                 logger.warning(f"Failed to insert question at position {position}: {q_error}")
                 continue
 
-        logger.info(
-            f"Extraction complete: {len(inserted_questions)} questions "
-            f"inserted into section {section_id}"
-        )
+        logger.info(f"Extraction complete: {len(inserted_questions)} questions inserted into section {section_id}")
 
         return {
             "section_id": section_id,

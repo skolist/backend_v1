@@ -56,7 +56,7 @@ def mock_short_answer_question() -> dict:
         "question_type": "short_answer",
         "answer_text": ("An object in motion will stay in motion unless acted upon by an external force."),
         "explanation": (
-            "This is the law of inertia. The state of motion of an object " "changes only when a force is applied."
+            "This is the law of inertia. The state of motion of an object changes only when a force is applied."
         ),
         "hardness_level": "easy",
         "marks": 3,

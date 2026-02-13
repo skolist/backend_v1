@@ -125,9 +125,7 @@ async def generate_questions(
         user_id = user.id
 
         if not check_user_has_credits(user_id):
-            return Response(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits"
-            )
+            return Response(status_code=status.HTTP_402_PAYMENT_REQUIRED, content="Insufficient credits")
 
         logger.debug(f"Custom instruction received: {request.instructions}")
 
@@ -155,11 +153,7 @@ async def generate_questions(
 
         if bank_question_ids:
             old_questions = (
-                supabase_client.table("bank_questions")
-                .select("*")
-                .in_("id", bank_question_ids)
-                .execute()
-                .data
+                supabase_client.table("bank_questions").select("*").in_("id", bank_question_ids).execute().data
             )
         else:
             old_questions = []

@@ -146,11 +146,7 @@ class ColoredConsoleFormatter(logging.Formatter):
             "message",
         }
 
-        extra_fields = {
-            k: v
-            for k, v in record.__dict__.items()
-            if k not in standard_attrs and not k.startswith("_")
-        }
+        extra_fields = {k: v for k, v in record.__dict__.items() if k not in standard_attrs and not k.startswith("_")}
 
         if extra_fields:
             extras_str = " | " + " ".join(f"{k}={v}" for k, v in extra_fields.items())

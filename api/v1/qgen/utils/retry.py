@@ -44,9 +44,7 @@ async def generate_content_with_retries(
 
     while attempt < retries:
         try:
-            logger.debug(
-                f"Attempt {attempt + 1} to call Gemini generate_content for endpoint {api_endpoint}"
-            )
+            logger.debug(f"Attempt {attempt + 1} to call Gemini generate_content for endpoint {api_endpoint}")
             return await gemini_client.aio.models.generate_content(
                 model=model,
                 contents=contents,
@@ -57,8 +55,7 @@ async def generate_content_with_retries(
             attempt += 1
             if attempt >= retries:
                 logger.error(
-                    f"Gemini generate_content failed after {retries} retries "
-                    f"for endpoint {api_endpoint}: {e}",
+                    f"Gemini generate_content failed after {retries} retries for endpoint {api_endpoint}: {e}",
                     exc_info=True,
                 )
                 raise last_exc from e

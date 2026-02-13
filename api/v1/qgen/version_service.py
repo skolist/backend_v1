@@ -108,11 +108,7 @@ def create_new_version_on_update(
     try:
         # 0. Fetch the current question to get ALL fields (required for NOT NULL constraints)
         current_question_result = (
-            supabase_client.table("gen_questions")
-            .select("*")
-            .eq("id", gen_question_id)
-            .single()
-            .execute()
+            supabase_client.table("gen_questions").select("*").eq("id", gen_question_id).single().execute()
         )
 
         if not current_question_result.data:
@@ -135,9 +131,7 @@ def create_new_version_on_update(
 
         if not active_result.data:
             # No active version exists - create initial version first
-            logger.warning(
-                f"No active version found for question {gen_question_id}, creating initial version"
-            )
+            logger.warning(f"No active version found for question {gen_question_id}, creating initial version")
             return create_initial_version(supabase_client, gen_question_id, full_question_data)
 
         current_active = active_result.data

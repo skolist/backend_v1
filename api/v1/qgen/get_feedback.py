@@ -62,9 +62,7 @@ async def get_feedback(
     # Fetch the draft and its questions from the database
     try:
         # Fetch draft to verify it exists
-        draft_response = (
-            supabase_client.table("qgen_drafts").select("*").eq("id", request.draft_id).execute()
-        )
+        draft_response = supabase_client.table("qgen_drafts").select("*").eq("id", request.draft_id).execute()
 
         if not draft_response.data:
             raise HTTPException(status_code=404, detail="Draft not found")
@@ -75,10 +73,7 @@ async def get_feedback(
         )
 
         sections_response = (
-            supabase_client.table("qgen_draft_sections")
-            .select("id")
-            .eq("qgen_draft_id", request.draft_id)
-            .execute()
+            supabase_client.table("qgen_draft_sections").select("id").eq("qgen_draft_id", request.draft_id).execute()
         )
 
         section_ids = [section["id"] for section in sections_response.data]
@@ -175,9 +170,7 @@ async def get_feedback(
                 opt3 = question.get("option3", "")[:50]
                 opt4 = question.get("option4", "")[:50]
                 q_detail += f"\n- Options: {opt1}, {opt2}, {opt3}, {opt4}"
-            elif question.get("question_type") == "match_the_following" and question.get(
-                "match_the_following_columns"
-            ):
+            elif question.get("question_type") == "match_the_following" and question.get("match_the_following_columns"):
                 q_detail += f"\n- Columns: {str(question.get('match_the_following_columns'))[:200]}"
 
             questions_details.append(q_detail)
