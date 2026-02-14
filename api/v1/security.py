@@ -68,8 +68,6 @@ def check_phone_number(
                 "error_type": type(e).__name__,
             },
         )
-        # In case of error, we can return False or raise an exception.
-        # Returning False might be safer to avoid leaking error details,
         # but 500 is appropriate for server errors.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
