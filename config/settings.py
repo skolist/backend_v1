@@ -72,22 +72,6 @@ if not FIREBASE_CREDENTIALS:
         "Environment variable not set",
         extra={"variable_name": "FIREBASE_CREDENTIALS"},
     )
-# if not SMS_HOOK_SECRET:
-#     logger.warning(
-#         "Environment variable not set",
-#         extra={"variable_name": "SMS_HOOK_SECRET"},
-#     )
-
-# if not MSG91_AUTH_KEY:
-#     logger.warning(
-#         "Environment variable not set",
-#         extra={"variable_name": "MSG91_AUTH_KEY"},
-#     )
-# if not MSG91_TEMPLATE_ID:
-#     logger.warning(
-#         "Environment variable not set",
-#         extra={"variable_name": "MSG91_TEMPLATE_ID"},
-#     )
 
 if not DEPLOYMENT_ENV or DEPLOYMENT_ENV not in {"PRODUCTION", "STAGE", "LOCAL"}:
     logger.warning(
