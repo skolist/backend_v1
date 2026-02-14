@@ -130,31 +130,52 @@ async def generate_questions(
         logger.debug(f"Custom instruction received: {request.instructions}")
 
         # Fetch concepts
-        concepts = (
-            supabase_client.table("concepts")
-            .select("id, name, description")
-            .in_("id", [str(cid) for cid in request.concept_ids])
-            .execute()
-            .data
-        )
+        def chunked(lst, size):
+            for i in range(0, len(lst), size):
+                yield lst[i : i + size]
+
+        try:
+            ids = [str(cid) for cid in request.concept_ids if cid]
+            concepts = []
+
+            for batch in chunked(ids, 300):
+                response = supabase_client.table("concepts").select("id, name, description").in_("id", batch).execute()
+                concepts.extend(response.data or [])
+        except Exception as e:
+            logger.exception(f"Error fetching concepts: {e}")
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         concepts_dict = {concept["name"]: concept["description"] for concept in concepts}
         concepts_name_to_id = {concept["name"]: concept["id"] for concept in concepts}
 
         # Fetch historical questions for reference
-        concept_maps = (
-            supabase_client.table("bank_questions_concepts_maps")
-            .select("bank_question_id")
-            .in_("concept_id", [str(cid) for cid in request.concept_ids])
-            .execute()
-            .data
-        )
+        try:
+            ids = [str(cid) for cid in request.concept_ids if cid]
+            concept_maps = []
+
+            for batch in chunked(ids, 300):
+                response = (
+                    supabase_client.table("bank_questions_concepts_maps")
+                    .select("bank_question_id")
+                    .in_("concept_id", batch)
+                    .execute()
+                )
+            concept_maps.extend(response.data or [])
+        except Exception as e:
+            logger.warning(f"Error Fetching the concept maps: {e}")
+            concept_maps = []
+
         bank_question_ids = list({m["bank_question_id"] for m in concept_maps})
 
         if bank_question_ids:
-            old_questions = (
-                supabase_client.table("bank_questions").select("*").in_("id", bank_question_ids).execute().data
-            )
+            try:
+                old_questions = []
+                for batch in chunked(bank_question_ids, 300):
+                    response = supabase_client.table("bank_questions").select("*").in_("id", batch).execute()
+                    old_questions.extend(response.data or [])
+            except Exception as e:
+                logger.warning(f"Error Fetching the old questions: {e}")
+                old_questions = []
         else:
             old_questions = []
 
