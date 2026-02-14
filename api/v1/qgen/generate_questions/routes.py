@@ -164,16 +164,6 @@ async def generate_questions(
 
         logger.debug(f"Total batches created: {len(batches)}")
 
-        # Snapshot existing question IDs before inserting new ones
-        existing_questions = (
-            supabase_client.table("gen_questions")
-            .select("id")
-            .eq("activity_id", str(request.activity_id))
-            .execute()
-            .data
-        )
-        existing_question_ids = [q["id"] for q in existing_questions]
-
         # Initialize context
         gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -193,15 +183,6 @@ async def generate_questions(
             supabase_client=supabase_client,
             max_retries=3,
         )
-
-        # Mark pre-existing questions in this activity as no longer new
-        if existing_question_ids:
-            try:
-                supabase_client.table("gen_questions").update({"is_new": False}).in_(
-                    "id", existing_question_ids
-                ).execute()
-            except Exception as e:
-                logger.warning(f"Failed to mark questions as not new: {e}")
 
         # Credits deduction
         questions_inserted = result.get("questions_inserted", 0)
