@@ -160,7 +160,7 @@ async def generate_questions(
                     .in_("concept_id", batch)
                     .execute()
                 )
-            concept_maps.extend(response.data or [])
+                concept_maps.extend(response.data or [])
         except Exception as e:
             logger.warning(f"Error Fetching the concept maps: {e}")
             concept_maps = []
